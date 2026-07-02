@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>设置 | CrossBorder Store Review Monitor Lite</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body data-page="settings">
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">CB</div>
+          <div>
+            <strong>Review Monitor Lite</strong>
+            <p>跨境店铺评论监控</p>
+          </div>
+        </div>
+        <nav class="nav">
+          <a class="nav-item" href="./index.html">首页 Dashboard</a>
+          <a class="nav-item" href="./stores.html">店铺管理</a>
+          <a class="nav-item" href="./products.html">产品总表</a>
+          <a class="nav-item" href="./reviews.html">评论总表</a>
+          <a class="nav-item" href="./comparison.html">同款多店铺评论对比</a>
+          <a class="nav-item" href="./product-detail.html">产品详情</a>
+          <a class="nav-item" href="./supplier-tasks.html">供应商整改任务</a>
+          <a class="nav-item" href="./reports.html">报告中心</a>
+          <a class="nav-item active" href="./settings.html">设置</a>
+        </nav>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <h1>设置</h1>
+            <p>预留本地路径、字段映射、汇率、账号与云部署相关配置入口</p>
+          </div>
+          <div class="topbar-actions">
+            <button class="button ghost">恢复默认</button>
+            <button class="button primary">保存设置</button>
+          </div>
+        </header>
+
+        <section class="two-col">
+          <div class="panel">
+            <div class="panel-head compact">
+              <h2>基础配置</h2>
+              <span class="chip neutral">V1 本地优先</span>
+            </div>
+            <div class="form-grid">
+              <label><span>默认数据目录</span><input type="text" value="/Users/demo/CrossBorderMonitor/data" /></label>
+              <label><span>导出目录</span><input type="text" value="/Users/demo/CrossBorderMonitor/export" /></label>
+              <label><span>默认汇率 USD/CNY</span><input type="text" value="7.16" /></label>
+              <label><span>默认汇率 JPY/CNY</span><input type="text" value="0.048" /></label>
+              <label><span>默认报告模板</span><select><option>标准评论分析模板</option></select></label>
+              <label><span>评论图片缓存策略</span><select><option>仅保存缩略图路径</option></select></label>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head compact">
+              <h2>字段映射与预留能力</h2>
+              <span class="chip success">云部署预留</span>
+            </div>
+            <div class="setting-list">
+              <div><strong>产品导入字段映射</strong><span>ASIN / SKU / 标题 / 价格 / 评分 / 评论数</span></div>
+              <div><strong>评论导入字段映射</strong><span>评论ID / 星级 / 时间 / 内容 / 图片 / 问题分类</span></div>
+              <div><strong>账号系统占位</strong><span>users / roles / auth middleware / login page</span></div>
+              <div><strong>操作日志占位</strong><span>新增、导入、导出、批量整改操作日志</span></div>
+              <div><strong>日本 / 韩国导入提示</strong><span>V1 手动导入优先，V2 再做低频同步</span></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>登录页 / 角色权限预留</h2>
+              <p>本轮不做后端，只做占位，方便后续扩展</p>
+            </div>
+            <span class="chip warn">原型占位</span>
+          </div>
+          <div class="placeholder-auth">
+            <div class="auth-card">
+              <h3>Login Placeholder</h3>
+              <input type="text" placeholder="邮箱 / 用户名" />
+              <input type="password" placeholder="密码" />
+              <button class="button primary full">登录</button>
+              <p>V1 本地版默认免登录，云部署后启用。</p>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script src="./app.js"></script>
+  </body>
+</html>

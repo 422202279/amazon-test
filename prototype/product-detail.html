@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>产品详情 | CrossBorder Store Review Monitor Lite</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body data-page="product-detail">
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">CB</div>
+          <div>
+            <strong>Review Monitor Lite</strong>
+            <p>跨境店铺评论监控</p>
+          </div>
+        </div>
+        <nav class="nav">
+          <a class="nav-item" href="./index.html">首页 Dashboard</a>
+          <a class="nav-item" href="./stores.html">店铺管理</a>
+          <a class="nav-item" href="./products.html">产品总表</a>
+          <a class="nav-item" href="./reviews.html">评论总表</a>
+          <a class="nav-item" href="./comparison.html">同款多店铺评论对比</a>
+          <a class="nav-item active" href="./product-detail.html">产品详情</a>
+          <a class="nav-item" href="./supplier-tasks.html">供应商整改任务</a>
+          <a class="nav-item" href="./reports.html">报告中心</a>
+          <a class="nav-item" href="./settings.html">设置</a>
+        </nav>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <h1>产品详情</h1>
+            <p>ASIN: B0DXSEAT01 · 记忆棉人体工学坐垫 · US Home Store</p>
+          </div>
+          <div class="topbar-actions">
+            <button class="button ghost">打开产品链接</button>
+            <button class="button primary">创建对比分析</button>
+          </div>
+        </header>
+
+        <section class="detail-hero">
+          <div class="product-card-large">
+            <div class="thumb xl tone-4"></div>
+            <div>
+              <h2>记忆棉人体工学坐垫</h2>
+              <p>类目：Home & Kitchen · 品牌：ComfortNest</p>
+              <div class="meta-inline">
+                <span class="chip warn">新增差评</span>
+                <span class="chip danger">购物车风险</span>
+                <span class="chip neutral">供应商处理中</span>
+              </div>
+            </div>
+          </div>
+          <div class="detail-metrics">
+            <div><span>评分</span><strong>4.1</strong></div>
+            <div><span>评论数</span><strong>1,284</strong></div>
+            <div><span>近30天销量</span><strong>642</strong></div>
+            <div><span>带图评论</span><strong>93</strong></div>
+            <div><span>差评占比</span><strong>8.6%</strong></div>
+            <div><span>供应商</span><strong>宁波舒垫工厂</strong></div>
+          </div>
+        </section>
+
+        <section class="two-col">
+          <div class="panel">
+            <div class="panel-head compact">
+              <h2>产品基础信息</h2>
+              <span class="chip neutral">Listing 摘要</span>
+            </div>
+            <div class="detail-grid">
+              <div><span>店铺</span><strong>US Home Store</strong></div>
+              <div><span>站点</span><strong>美国</strong></div>
+              <div><span>价格</span><strong>$29.99</strong></div>
+              <div><span>变体数</span><strong>4</strong></div>
+              <div><span>父 ASIN</span><strong>B0DXPARENT9</strong></div>
+              <div><span>主要流量词</span><strong>seat cushion, office cushion</strong></div>
+            </div>
+            <div class="copy-block">
+              <h3>五点描述</h3>
+              <ul>
+                <li>高密度记忆棉，适合办公室和居家场景</li>
+                <li>尾椎减压 U 型开口设计</li>
+                <li>可拆洗防滑布套</li>
+                <li>适配办公椅、汽车座椅和餐椅</li>
+                <li>压缩包装，拆封后 24 小时恢复形状</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head compact">
+              <h2>星级分布与问题聚焦</h2>
+              <span class="chip warn">归因观察</span>
+            </div>
+            <div class="bars">
+              <div class="bar-row"><span>5 星</span><div><i style="width:62%"></i></div><strong>62%</strong></div>
+              <div class="bar-row"><span>4 星</span><div><i style="width:17%"></i></div><strong>17%</strong></div>
+              <div class="bar-row"><span>3 星</span><div><i style="width:9%"></i></div><strong>9%</strong></div>
+              <div class="bar-row"><span>2 星</span><div><i style="width:6%"></i></div><strong>6%</strong></div>
+              <div class="bar-row"><span>1 星</span><div><i style="width:6%"></i></div><strong>6%</strong></div>
+            </div>
+            <div class="issue-notes">
+              <div><strong>TOP1</strong><span>使用一周后坐感塌陷</span></div>
+              <div><strong>TOP2</strong><span>尺寸偏小，不适配大椅面</span></div>
+              <div><strong>TOP3</strong><span>真空包装后回弹慢</span></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="two-col">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>最新评论</h2>
+                <p>保留缩略图、星级与问题分类，方便下钻到评论总表</p>
+              </div>
+              <a href="./reviews.html" class="text-link">去评论总表</a>
+            </div>
+            <div class="review-feed" id="detail-review-feed"></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>整改记录</h2>
+                <p>对接供应商整改动作，形成问题闭环</p>
+              </div>
+              <a href="./supplier-tasks.html" class="text-link">去任务页</a>
+            </div>
+            <div class="timeline">
+              <div class="timeline-item"><strong>06-27</strong><span>供应商确认增加内芯密度抽检</span></div>
+              <div class="timeline-item"><strong>06-25</strong><span>整理 12 条带图差评证据并发送工厂</span></div>
+              <div class="timeline-item"><strong>06-23</strong><span>运营反馈美国站差评集中在坐感塌陷</span></div>
+              <div class="timeline-item"><strong>06-20</strong><span>建立整改任务 SR-2048，优先级高</span></div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script src="./app.js"></script>
+  </body>
+</html>

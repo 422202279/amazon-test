@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard | CrossBorder Store Review Monitor Lite</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body data-page="dashboard">
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">CB</div>
+          <div>
+            <strong>Review Monitor Lite</strong>
+            <p>跨境店铺评论监控</p>
+          </div>
+        </div>
+        <nav class="nav">
+          <a class="nav-item active" href="./index.html">首页 Dashboard</a>
+          <a class="nav-item" href="./stores.html">店铺管理</a>
+          <a class="nav-item" href="./products.html">产品总表</a>
+          <a class="nav-item" href="./reviews.html">评论总表</a>
+          <a class="nav-item" href="./comparison.html">同款多店铺评论对比</a>
+          <a class="nav-item" href="./product-detail.html">产品详情</a>
+          <a class="nav-item" href="./supplier-tasks.html">供应商整改任务</a>
+          <a class="nav-item" href="./reports.html">报告中心</a>
+          <a class="nav-item" href="./settings.html">设置</a>
+        </nav>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <h1>Dashboard</h1>
+            <p>集中查看全站点评论风险、整改进度与产品异常信号</p>
+          </div>
+          <div class="topbar-actions">
+            <button class="button ghost">导出周报</button>
+            <button class="button primary">新建分析报告</button>
+          </div>
+        </header>
+
+        <section class="filters">
+          <div class="filter-row">
+            <label>平台</label>
+            <select>
+              <option>全部平台</option>
+              <option>Amazon</option>
+              <option>Coupang</option>
+              <option>Naver</option>
+            </select>
+          </div>
+          <div class="filter-row">
+            <label>站点</label>
+            <select>
+              <option>全部站点</option>
+              <option>美国</option>
+              <option>英国</option>
+              <option>德国</option>
+              <option>日本</option>
+              <option>韩国</option>
+            </select>
+          </div>
+          <div class="filter-row filter-search">
+            <label>关键词</label>
+            <input type="text" placeholder="搜索产品 / ASIN / SKU / 店铺" />
+          </div>
+          <div class="filter-row">
+            <label>时间</label>
+            <select>
+              <option>近 30 天</option>
+              <option>近 7 天</option>
+              <option>近 90 天</option>
+            </select>
+          </div>
+          <button class="button">刷新</button>
+        </section>
+
+        <section class="stats-grid">
+          <article class="stat-card">
+            <span class="stat-label">在监控店铺</span>
+            <strong>9</strong>
+            <em>覆盖 Amazon / Coupang / Naver</em>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">产品总数</span>
+            <strong>126</strong>
+            <em>近 30 天新增 11 个</em>
+          </article>
+          <article class="stat-card warn">
+            <span class="stat-label">近 30 天差评</span>
+            <strong>84</strong>
+            <em>同比上升 13.2%</em>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">带图评论</span>
+            <strong>218</strong>
+            <em>图证充足，适合归因</em>
+          </article>
+          <article class="stat-card danger">
+            <span class="stat-label">购物车丢失</span>
+            <strong>6</strong>
+            <em>3 个发生在美国站</em>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">待整改任务</span>
+            <strong>27</strong>
+            <em>高优先级 9 个</em>
+          </article>
+        </section>
+
+        <section class="two-col">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>异常产品雷达</h2>
+                <p>优先跟进评分下降、差评新增、购物车异常的产品</p>
+              </div>
+              <a href="./products.html" class="text-link">查看产品总表</a>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>产品</th>
+                    <th>店铺</th>
+                    <th>评分</th>
+                    <th>近30天差评</th>
+                    <th>带图差评</th>
+                    <th>主要问题</th>
+                    <th>整改</th>
+                  </tr>
+                </thead>
+                <tbody id="dashboard-risk-products"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>今日重点评论</h2>
+                <p>新出现的低星和带图评论，方便快速归因</p>
+              </div>
+              <a href="./reviews.html" class="text-link">查看评论总表</a>
+            </div>
+            <div class="review-feed" id="dashboard-review-feed"></div>
+          </div>
+        </section>
+
+        <section class="three-col">
+          <div class="panel">
+            <div class="panel-head compact">
+              <h2>站点评分趋势</h2>
+              <span class="chip neutral">近 30 天</span>
+            </div>
+            <div class="spark-group" id="dashboard-score-sparks"></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head compact">
+              <h2>问题分类 TOP5</h2>
+              <span class="chip warn">差评归因</span>
+            </div>
+            <div class="bars" id="dashboard-top-issues"></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head compact">
+              <h2>资讯链接</h2>
+              <span class="chip success">手动维护</span>
+            </div>
+            <ul class="news-list">
+              <li><a href="#">亚马逊欧洲站包装新规摘要</a><span>政策</span></li>
+              <li><a href="#">Coupang 近期评价展示逻辑变化</a><span>平台</span></li>
+              <li><a href="#">日本站夏季物流延迟预警</a><span>物流</span></li>
+              <li><a href="#">北美家居类差评高频词观察</a><span>市场</span></li>
+            </ul>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script src="./app.js"></script>
+  </body>
+</html>

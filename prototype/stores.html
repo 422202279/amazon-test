@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>店铺管理 | CrossBorder Store Review Monitor Lite</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body data-page="stores">
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">CB</div>
+          <div>
+            <strong>Review Monitor Lite</strong>
+            <p>跨境店铺评论监控</p>
+          </div>
+        </div>
+        <nav class="nav">
+          <a class="nav-item" href="./index.html">首页 Dashboard</a>
+          <a class="nav-item active" href="./stores.html">店铺管理</a>
+          <a class="nav-item" href="./products.html">产品总表</a>
+          <a class="nav-item" href="./reviews.html">评论总表</a>
+          <a class="nav-item" href="./comparison.html">同款多店铺评论对比</a>
+          <a class="nav-item" href="./product-detail.html">产品详情</a>
+          <a class="nav-item" href="./supplier-tasks.html">供应商整改任务</a>
+          <a class="nav-item" href="./reports.html">报告中心</a>
+          <a class="nav-item" href="./settings.html">设置</a>
+        </nav>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <h1>店铺管理</h1>
+            <p>维护 Amazon / Coupang / Naver 多站点店铺信息，预留导入导出操作位</p>
+          </div>
+          <div class="topbar-actions">
+            <button class="button ghost">导入 Excel</button>
+            <button class="button primary">新增店铺</button>
+          </div>
+        </header>
+
+        <section class="filters">
+          <div class="filter-row">
+            <label>平台</label>
+            <select>
+              <option>全部平台</option>
+              <option>Amazon</option>
+              <option>Coupang</option>
+              <option>Naver</option>
+            </select>
+          </div>
+          <div class="filter-row">
+            <label>状态</label>
+            <select>
+              <option>全部状态</option>
+              <option>正常监控</option>
+              <option>待补数据</option>
+              <option>暂停</option>
+            </select>
+          </div>
+          <div class="filter-row filter-search">
+            <label>搜索</label>
+            <input type="text" placeholder="店铺名 / 国家 / Seller ID" />
+          </div>
+          <button class="button">筛选</button>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>店铺列表</h2>
+              <p>静态原型展示字段密度、状态标签和操作位</p>
+            </div>
+            <div class="segmented">
+              <button class="active">表格视图</button>
+              <button>分组视图</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>店铺</th>
+                  <th>平台</th>
+                  <th>站点</th>
+                  <th>Seller ID</th>
+                  <th>产品数</th>
+                  <th>近30天评论</th>
+                  <th>评分</th>
+                  <th>状态</th>
+                  <th>最后同步</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="stores-table"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script src="./app.js"></script>
+  </body>
+</html>

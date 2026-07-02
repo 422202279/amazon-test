@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>产品总表 | CrossBorder Store Review Monitor Lite</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body data-page="products">
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">CB</div>
+          <div>
+            <strong>Review Monitor Lite</strong>
+            <p>跨境店铺评论监控</p>
+          </div>
+        </div>
+        <nav class="nav">
+          <a class="nav-item" href="./index.html">首页 Dashboard</a>
+          <a class="nav-item" href="./stores.html">店铺管理</a>
+          <a class="nav-item active" href="./products.html">产品总表</a>
+          <a class="nav-item" href="./reviews.html">评论总表</a>
+          <a class="nav-item" href="./comparison.html">同款多店铺评论对比</a>
+          <a class="nav-item" href="./product-detail.html">产品详情</a>
+          <a class="nav-item" href="./supplier-tasks.html">供应商整改任务</a>
+          <a class="nav-item" href="./reports.html">报告中心</a>
+          <a class="nav-item" href="./settings.html">设置</a>
+        </nav>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <h1>产品总表</h1>
+            <p>一行一个产品，聚合店铺、销量、评分、购物车和整改状态</p>
+          </div>
+          <div class="topbar-actions">
+            <button class="button ghost">字段配置</button>
+            <button class="button ghost">导出 Excel</button>
+            <button class="button primary">新增产品</button>
+          </div>
+        </header>
+
+        <section class="filters dense">
+          <div class="filter-row">
+            <label>平台</label>
+            <select><option>全部</option><option>Amazon</option><option>Coupang</option><option>Naver</option></select>
+          </div>
+          <div class="filter-row">
+            <label>站点</label>
+            <select><option>全部</option><option>美国</option><option>英国</option><option>德国</option><option>日本</option><option>韩国</option></select>
+          </div>
+          <div class="filter-row">
+            <label>店铺</label>
+            <select><option>全部店铺</option><option>US Home</option><option>UK Living</option></select>
+          </div>
+          <div class="filter-row">
+            <label>购物车</label>
+            <select><option>全部</option><option>正常</option><option>已丢失</option></select>
+          </div>
+          <div class="filter-row">
+            <label>整改状态</label>
+            <select><option>全部</option><option>待反馈</option><option>处理中</option><option>观察中</option></select>
+          </div>
+          <div class="filter-row">
+            <label>差评风险</label>
+            <select><option>全部</option><option>高风险</option><option>中风险</option></select>
+          </div>
+          <div class="filter-row filter-search wide">
+            <label>搜索</label>
+            <input type="text" placeholder="ASIN / SKU / 标题 / 品牌 / 流量词" />
+          </div>
+          <button class="button">应用筛选</button>
+        </section>
+
+        <section class="table-summary">
+          <div class="summary-pill">产品数 126</div>
+          <div class="summary-pill">美国站 34</div>
+          <div class="summary-pill">带新增差评 18</div>
+          <div class="summary-pill warn">购物车丢失 6</div>
+          <div class="summary-pill">需供应商跟进 21</div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>产品总表主视图</h2>
+              <p>按真实产品数据结构扩展字段，并支持勾选展示字段，兼顾宽表与扫描效率</p>
+            </div>
+            <div class="panel-actions">
+              <div class="segmented">
+                <button class="active">主表</button>
+                <button>销量视图</button>
+                <button>评论视图</button>
+              </div>
+              <button class="button ghost" id="toggle-product-columns">展示字段</button>
+            </div>
+          </div>
+          <div class="column-picker hidden" id="product-column-picker">
+            <div class="column-picker-head">
+              <h3>展示字段</h3>
+              <span>原型示意：后续可记住个人偏好</span>
+            </div>
+            <div class="column-picker-grid" id="product-column-options"></div>
+          </div>
+          <div class="table-wrap table-wide">
+            <table>
+              <thead>
+                <tr>
+                  <th data-col="product">产品</th>
+                  <th data-col="store">店铺 / 站点</th>
+                  <th data-col="platform">平台</th>
+                  <th data-col="category">类目</th>
+                  <th data-col="price">价格</th>
+                  <th data-col="sales">近30天销量</th>
+                  <th data-col="reviews">Review总数</th>
+                  <th data-col="rating">评分</th>
+                  <th data-col="keywords">关键词</th>
+                  <th data-col="bsr">BSR</th>
+                  <th data-col="dimensions">尺寸 / 重量</th>
+                  <th data-col="sellerCount">跟卖</th>
+                  <th data-col="buybox">购物车</th>
+                  <th data-col="negative">新增差评</th>
+                  <th data-col="issue">主要差评原因</th>
+                  <th data-col="supplier">供应商</th>
+                  <th data-col="rectify">整改状态</th>
+                </tr>
+              </thead>
+              <tbody id="products-table"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script src="./app.js"></script>
+  </body>
+</html>

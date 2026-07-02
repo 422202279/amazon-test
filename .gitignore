@@ -1,0 +1,9 @@
+.codebase-memory/
+backend/data/
+backend/__pycache__/
+backend/app/__pycache__/
+backend/app/models/__pycache__/
+backend/app/routers/__pycache__/
+backend/app/services/__pycache__/
+*.pyc
+.DS_Store

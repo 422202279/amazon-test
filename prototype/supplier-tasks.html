@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>供应商整改任务 | CrossBorder Store Review Monitor Lite</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body data-page="supplier-tasks">
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">CB</div>
+          <div>
+            <strong>Review Monitor Lite</strong>
+            <p>跨境店铺评论监控</p>
+          </div>
+        </div>
+        <nav class="nav">
+          <a class="nav-item" href="./index.html">首页 Dashboard</a>
+          <a class="nav-item" href="./stores.html">店铺管理</a>
+          <a class="nav-item" href="./products.html">产品总表</a>
+          <a class="nav-item" href="./reviews.html">评论总表</a>
+          <a class="nav-item" href="./comparison.html">同款多店铺评论对比</a>
+          <a class="nav-item" href="./product-detail.html">产品详情</a>
+          <a class="nav-item active" href="./supplier-tasks.html">供应商整改任务</a>
+          <a class="nav-item" href="./reports.html">报告中心</a>
+          <a class="nav-item" href="./settings.html">设置</a>
+        </nav>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <h1>供应商整改任务</h1>
+            <p>从评论批量生成问题任务，跟踪待反馈、处理中、已整改、观察中状态</p>
+          </div>
+          <div class="topbar-actions">
+            <button class="button ghost">导出整改表</button>
+            <button class="button primary">新建整改任务</button>
+          </div>
+        </header>
+
+        <section class="kanban-summary">
+          <div class="kanban-stat"><span>待反馈</span><strong>8</strong></div>
+          <div class="kanban-stat"><span>处理中</span><strong>11</strong></div>
+          <div class="kanban-stat"><span>观察中</span><strong>5</strong></div>
+          <div class="kanban-stat"><span>已整改</span><strong>34</strong></div>
+        </section>
+
+        <section class="kanban" id="task-board"></section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>任务总表</h2>
+              <p>适合导出给供应商或作为内部跟踪清单</p>
+            </div>
+            <span class="chip success">支持从评论批量生成</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>任务ID</th>
+                  <th>产品</th>
+                  <th>供应商</th>
+                  <th>问题类型</th>
+                  <th>证据摘要</th>
+                  <th>优先级</th>
+                  <th>状态</th>
+                  <th>截止时间</th>
+                </tr>
+              </thead>
+              <tbody id="tasks-table"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script src="./app.js"></script>
+  </body>
+</html>

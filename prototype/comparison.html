@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>同款多店铺评论对比 | CrossBorder Store Review Monitor Lite</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body data-page="comparison">
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">CB</div>
+          <div>
+            <strong>Review Monitor Lite</strong>
+            <p>跨境店铺评论监控</p>
+          </div>
+        </div>
+        <nav class="nav">
+          <a class="nav-item" href="./index.html">首页 Dashboard</a>
+          <a class="nav-item" href="./stores.html">店铺管理</a>
+          <a class="nav-item" href="./products.html">产品总表</a>
+          <a class="nav-item" href="./reviews.html">评论总表</a>
+          <a class="nav-item active" href="./comparison.html">同款多店铺评论对比</a>
+          <a class="nav-item" href="./product-detail.html">产品详情</a>
+          <a class="nav-item" href="./supplier-tasks.html">供应商整改任务</a>
+          <a class="nav-item" href="./reports.html">报告中心</a>
+          <a class="nav-item" href="./settings.html">设置</a>
+        </nav>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <h1>同款多店铺评论对比</h1>
+            <p>横向对比多个店铺同一个产品的评分、差评占比、带图评论与问题 TOP3</p>
+          </div>
+          <div class="topbar-actions">
+            <button class="button ghost">导出对比表</button>
+            <button class="button primary">生成 Markdown 报告</button>
+          </div>
+        </header>
+
+        <section class="filters">
+          <div class="filter-row filter-search wide">
+            <label>产品</label>
+            <input type="text" value="记忆棉坐垫 / Parent ASIN: B0DXSEAT01" />
+          </div>
+          <div class="filter-row">
+            <label>对比范围</label>
+            <select><option>全部店铺</option><option>仅 Amazon</option><option>含韩国站</option></select>
+          </div>
+          <div class="filter-row">
+            <label>周期</label>
+            <select><option>近 30 天</option><option>近 90 天</option></select>
+          </div>
+          <button class="button">开始对比</button>
+        </section>
+
+        <section class="comparison-hero" id="comparison-cards"></section>
+
+        <section class="two-col comparison-layout">
+          <div class="panel">
+            <div class="panel-head compact">
+              <h2>评分 / 差评 / 评论量概览</h2>
+              <span class="chip neutral">静态图表原型</span>
+            </div>
+            <div class="chart-stack">
+              <div class="mini-chart">
+                <h3>各店铺评分对比</h3>
+                <div class="bar-grid" id="comparison-score-bars"></div>
+              </div>
+              <div class="mini-chart">
+                <h3>各店铺差评占比</h3>
+                <div class="bar-grid warning" id="comparison-negative-bars"></div>
+              </div>
+              <div class="mini-chart">
+                <h3>各店铺评论数量</h3>
+                <div class="bar-grid cool" id="comparison-volume-bars"></div>
+              </div>
+              <div class="mini-chart">
+                <h3>各店铺问题分类分布</h3>
+                <div class="issue-grid" id="comparison-issue-grid"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>多店铺对比表</h2>
+                <p>用来识别共性问题和单站点问题</p>
+              </div>
+              <span class="chip warn">产品共性问题：坐感塌陷</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>店铺</th>
+                    <th>站点</th>
+                    <th>评分</th>
+                    <th>差评占比</th>
+                    <th>带图评论</th>
+                    <th>主要问题 TOP3</th>
+                    <th>建议动作</th>
+                  </tr>
+                </thead>
+                <tbody id="comparison-table"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script src="./app.js"></script>
+  </body>
+</html>
