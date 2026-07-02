@@ -49,7 +49,7 @@
           </div>
           <div class="filter-row">
             <label>站点</label>
-            <select><option>全部</option><option>美国</option><option>英国</option><option>德国</option><option>日本</option><option>韩国</option></select>
+            <select><option>全部</option><option>美国</option><option>英国</option><option>德国</option><option>日本</option><option>加拿大</option><option>法国</option><option>韩国</option></select>
           </div>
           <div class="filter-row">
             <label>店铺</label>
@@ -100,32 +100,14 @@
           <div class="column-picker hidden" id="product-column-picker">
             <div class="column-picker-head">
               <h3>展示字段</h3>
-              <span>原型示意：后续可记住个人偏好</span>
+              <span>可勾选显示，也可直接拖动调整列顺序</span>
             </div>
             <div class="column-picker-grid" id="product-column-options"></div>
           </div>
           <div class="table-wrap table-wide">
             <table>
               <thead>
-                <tr>
-                  <th data-col="product">产品</th>
-                  <th data-col="store">店铺 / 站点</th>
-                  <th data-col="platform">平台</th>
-                  <th data-col="category">类目</th>
-                  <th data-col="price">价格</th>
-                  <th data-col="sales">近30天销量</th>
-                  <th data-col="reviews">Review总数</th>
-                  <th data-col="rating">评分</th>
-                  <th data-col="keywords">关键词</th>
-                  <th data-col="bsr">BSR</th>
-                  <th data-col="dimensions">尺寸 / 重量</th>
-                  <th data-col="sellerCount">跟卖</th>
-                  <th data-col="buybox">购物车</th>
-                  <th data-col="negative">新增差评</th>
-                  <th data-col="issue">主要差评原因</th>
-                  <th data-col="supplier">供应商</th>
-                  <th data-col="rectify">整改状态</th>
-                </tr>
+                <tr id="products-table-head"></tr>
               </thead>
               <tbody id="products-table"></tbody>
             </table>

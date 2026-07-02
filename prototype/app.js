@@ -19,24 +19,26 @@ const products = [
 ];
 
 const productColumns = [
-  { key: "product", label: "产品", locked: true },
-  { key: "store", label: "店铺 / 站点", locked: true },
-  { key: "platform", label: "平台" },
-  { key: "category", label: "类目" },
-  { key: "price", label: "价格" },
-  { key: "sales", label: "近30天销量" },
-  { key: "reviews", label: "Review总数" },
-  { key: "rating", label: "评分" },
-  { key: "keywords", label: "关键词" },
-  { key: "bsr", label: "BSR" },
-  { key: "dimensions", label: "尺寸 / 重量" },
-  { key: "sellerCount", label: "跟卖卖家" },
-  { key: "buybox", label: "购物车" },
-  { key: "negative", label: "新增差评" },
-  { key: "issue", label: "主要差评原因" },
-  { key: "supplier", label: "供应商" },
-  { key: "rectify", label: "整改状态" }
+  { key: "product", label: "产品", locked: true, visible: true },
+  { key: "store", label: "店铺 / 站点", locked: true, visible: true },
+  { key: "platform", label: "平台", visible: true },
+  { key: "category", label: "类目", visible: true },
+  { key: "price", label: "价格", visible: true },
+  { key: "sales", label: "近30天销量", visible: true },
+  { key: "reviews", label: "Review总数", visible: true },
+  { key: "rating", label: "评分", visible: true },
+  { key: "keywords", label: "关键词", visible: true },
+  { key: "bsr", label: "BSR", visible: true },
+  { key: "dimensions", label: "尺寸 / 重量", visible: true },
+  { key: "sellerCount", label: "跟卖卖家", visible: true },
+  { key: "buybox", label: "购物车", visible: true },
+  { key: "negative", label: "新增差评", visible: true },
+  { key: "issue", label: "主要差评原因", visible: true },
+  { key: "supplier", label: "供应商", visible: true },
+  { key: "rectify", label: "整改状态", visible: true }
 ];
+
+const productColumnStorageKey = "cb-product-columns-v1";
 
 const reviews = [
   { tone: "tone-1", id: "RV-10021", title: "坐两天就塌了", product: "记忆棉人体工学坐垫", store: "US Home Store", site: "美国", platform: "Amazon", stars: 2, hasImage: true, content: "刚开始还可以，坐了几天中间明显塌陷，尾椎支撑不够，和图片有差距。", issue: "质量问题", mood: "负面", feedback: "未反馈", rectify: "待反馈", asin: "B0DXSEAT01" },
@@ -183,34 +185,15 @@ function renderStores() {
 
 function renderProducts() {
   const body = document.getElementById("products-table");
-  if (!body) return;
+  const head = document.getElementById("products-table-head");
+  if (!body || !head) return;
+
+  const visibleColumns = productColumns.filter((column) => column.visible);
+  head.innerHTML = visibleColumns.map((column) => `<th data-col="${column.key}">${column.label}</th>`).join("");
+
   body.innerHTML = products.map((item) => `
     <tr>
-      <td data-col="product">
-        <div class="product-cell">
-          <span class="thumb ${item.tone}"></span>
-          <div>
-            <span class="cell-title">${item.name}</span>
-            <span class="cell-sub">${item.asin} · ${item.sku}</span>
-          </div>
-        </div>
-      </td>
-      <td data-col="store">${item.store}<span class="cell-sub">${item.site}</span></td>
-      <td data-col="platform">${item.platform}</td>
-      <td data-col="category">${item.category}</td>
-      <td data-col="price">${item.price}</td>
-      <td data-col="sales">${item.sales}</td>
-      <td data-col="reviews">${item.reviews}</td>
-      <td data-col="rating">${item.rating}<span class="cell-sub">带图 ${item.imageReviews}</span></td>
-      <td data-col="keywords">${item.keywords}</td>
-      <td data-col="bsr">${item.bsr}</td>
-      <td data-col="dimensions">${item.dimensions}</td>
-      <td data-col="sellerCount">${item.sellerCount}</td>
-      <td data-col="buybox"><span class="status ${item.buybox === "正常" ? "success" : "danger"}">${item.buybox}</span></td>
-      <td data-col="negative"><span class="chip ${item.negative === "2 条" ? "neutral" : "danger"}">${item.negative}</span></td>
-      <td data-col="issue">${item.issue}</td>
-      <td data-col="supplier">${item.supplier}</td>
-      <td data-col="rectify"><span class="status ${statusClass(item.rectify)}">${item.rectify}</span></td>
+      ${visibleColumns.map((column) => `<td data-col="${column.key}">${renderProductCell(item, column.key)}</td>`).join("")}
     </tr>
   `).join("");
 }
@@ -222,25 +205,127 @@ function renderProductColumnPicker() {
   if (!container || !picker || !toggle) return;
 
   container.innerHTML = productColumns.map((column) => `
-    <label class="column-option">
-      <input type="checkbox" data-column="${column.key}" ${column.locked ? "checked disabled" : "checked"} />
+    <label class="column-option" draggable="true" data-column-order="${column.key}">
+      <input type="checkbox" data-column="${column.key}" ${column.visible ? "checked" : ""} ${column.locked ? "disabled" : ""} />
       <span>${column.label}</span>
     </label>
   `).join("");
 
-  toggle.addEventListener("click", () => {
+  toggle.onclick = () => {
     picker.classList.toggle("hidden");
-  });
+  };
 
   container.addEventListener("change", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLInputElement)) return;
     const key = target.dataset.column;
     if (!key) return;
-    document.querySelectorAll(`[data-col="${key}"]`).forEach((node) => {
-      node.style.display = target.checked ? "" : "none";
+    const column = productColumns.find((item) => item.key === key);
+    if (!column || column.locked) return;
+    column.visible = target.checked;
+    persistProductColumns();
+    renderProducts();
+  });
+
+  let draggingKey = null;
+
+  container.querySelectorAll(".column-option").forEach((item) => {
+    item.addEventListener("dragstart", () => {
+      draggingKey = item.dataset.columnOrder;
+      item.classList.add("dragging");
+    });
+
+    item.addEventListener("dragend", () => {
+      draggingKey = null;
+      item.classList.remove("dragging");
+      container.querySelectorAll(".column-option").forEach((option) => option.classList.remove("drop-target"));
+    });
+
+    item.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      if (!draggingKey || draggingKey === item.dataset.columnOrder) return;
+      container.querySelectorAll(".column-option").forEach((option) => option.classList.remove("drop-target"));
+      item.classList.add("drop-target");
+    });
+
+    item.addEventListener("drop", (event) => {
+      event.preventDefault();
+      const targetKey = item.dataset.columnOrder;
+      if (!draggingKey || !targetKey || draggingKey === targetKey) return;
+      reorderProductColumns(draggingKey, targetKey);
+      persistProductColumns();
+      renderProductColumnPicker();
+      renderProducts();
     });
   });
+}
+
+function renderProductCell(item, key) {
+  const cells = {
+    product: `
+      <div class="product-cell">
+        <span class="thumb ${item.tone}"></span>
+        <div>
+          <span class="cell-title">${item.name}</span>
+          <span class="cell-sub">${item.asin} · ${item.sku}</span>
+        </div>
+      </div>
+    `,
+    store: `${item.store}<span class="cell-sub">${item.site}</span>`,
+    platform: item.platform,
+    category: item.category,
+    price: item.price,
+    sales: item.sales,
+    reviews: item.reviews,
+    rating: `${item.rating}<span class="cell-sub">带图 ${item.imageReviews}</span>`,
+    keywords: item.keywords,
+    bsr: item.bsr,
+    dimensions: item.dimensions,
+    sellerCount: item.sellerCount,
+    buybox: `<span class="status ${item.buybox === "正常" ? "success" : "danger"}">${item.buybox}</span>`,
+    negative: `<span class="chip ${item.negative === "2 条" ? "neutral" : "danger"}">${item.negative}</span>`,
+    issue: item.issue,
+    supplier: item.supplier,
+    rectify: `<span class="status ${statusClass(item.rectify)}">${item.rectify}</span>`,
+  };
+  return cells[key] ?? "";
+}
+
+function reorderProductColumns(draggingKey, targetKey) {
+  const fromIndex = productColumns.findIndex((column) => column.key === draggingKey);
+  const toIndex = productColumns.findIndex((column) => column.key === targetKey);
+  if (fromIndex === -1 || toIndex === -1) return;
+  const [column] = productColumns.splice(fromIndex, 1);
+  productColumns.splice(toIndex, 0, column);
+}
+
+function persistProductColumns() {
+  localStorage.setItem(
+    productColumnStorageKey,
+    JSON.stringify(productColumns.map((column) => ({ key: column.key, visible: column.visible })))
+  );
+}
+
+function restoreProductColumns() {
+  const saved = localStorage.getItem(productColumnStorageKey);
+  if (!saved) return;
+  try {
+    const parsed = JSON.parse(saved);
+    const savedMap = new Map(parsed.map((item) => [item.key, item]));
+    const reordered = parsed
+      .map((item) => productColumns.find((column) => column.key === item.key))
+      .filter(Boolean);
+    const missing = productColumns.filter((column) => !savedMap.has(column.key));
+    productColumns.splice(0, productColumns.length, ...reordered, ...missing);
+    productColumns.forEach((column) => {
+      if (savedMap.has(column.key)) {
+        const savedColumn = savedMap.get(column.key);
+        column.visible = column.locked ? true : Boolean(savedColumn.visible);
+      }
+    });
+  } catch (error) {
+    console.warn("Failed to restore product column settings", error);
+  }
 }
 
 function renderReviews() {
@@ -412,6 +497,7 @@ function renderReports() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  restoreProductColumns();
   renderDashboard();
   renderStores();
   renderProducts();

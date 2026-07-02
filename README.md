@@ -23,6 +23,11 @@
 - `GET /api/products/import-preview/sellersprite`
 - `POST /api/products/import/internal`
 - `POST /api/products/import/sellersprite`
+- `GET /api/reviews`
+- `GET /api/reviews/import-preview`
+- `POST /api/reviews/import`
+- `GET /api/supplier-tasks`
+- `POST /api/supplier-tasks/generate-from-reviews`
 - `GET /api/metrics`
 - `GET /api/metrics/import-preview/sales-history`
 - `POST /api/metrics/import/sales-history`

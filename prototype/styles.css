@@ -400,6 +400,17 @@ select {
   border-radius: 10px;
   background: #fff;
   font-size: 13px;
+  cursor: grab;
+}
+
+.column-option.dragging {
+  opacity: 0.45;
+  border-style: dashed;
+}
+
+.column-option.drop-target {
+  border-color: var(--blue);
+  background: var(--blue-soft);
 }
 
 table {
