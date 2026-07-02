@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 
 from sqlalchemy import Date, DateTime, Float, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
@@ -49,5 +49,5 @@ class Product(Base):
     status: Mapped[str | None] = mapped_column(String(40), nullable=True)
     source_file: Mapped[str | None] = mapped_column(String(255), nullable=True)
     raw_payload: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))

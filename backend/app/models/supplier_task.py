@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 
 from sqlalchemy import Date, DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
@@ -20,5 +20,5 @@ class SupplierTask(Base):
     priority: Mapped[str] = mapped_column(String(20), default="medium")
     due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))

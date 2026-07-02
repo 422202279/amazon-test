@@ -15,8 +15,17 @@
 ## 当前后端可用能力
 
 - `GET /api/health`
+- `GET /api/stores`
+- `GET /api/stores/import-preview/internal`
+- `POST /api/stores/import/internal`
+- `GET /api/products`
 - `GET /api/products/import-preview/internal`
 - `GET /api/products/import-preview/sellersprite`
+- `POST /api/products/import/internal`
+- `POST /api/products/import/sellersprite`
+- `GET /api/metrics`
+- `GET /api/metrics/import-preview/sales-history`
+- `POST /api/metrics/import/sales-history`
 
 ## 本地启动
 
