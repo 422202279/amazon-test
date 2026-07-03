@@ -59,6 +59,8 @@
 - `deploy/bootstrap.sh`
 - `deploy/systemd/cb-monitor.service`
 - `deploy/nginx/cb-monitor.conf`
+- `scripts/deploy_self_check.py`
+- `scripts/local_smoke_test.py`
 
 ## 后续部署顺序
 
@@ -72,3 +74,9 @@
 8. 申请 HTTPS 证书
 9. 导入首批产品与评论样本
 10. 验证前台页面、接口、定时任务
+
+## 部署后建议立刻执行
+
+1. 跑健康检查：`python3 scripts/deploy_self_check.py`
+2. 跑业务冒烟：`python3 scripts/local_smoke_test.py`
+3. 创建首个数据库备份

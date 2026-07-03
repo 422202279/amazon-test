@@ -39,6 +39,8 @@
 - `GET /api/ops/source-capabilities`
 - `GET /api/ops/deployment-profile`
 - `GET /api/ops/live-validation`
+- `GET /api/ops/backups`
+- `POST /api/ops/backups/create`
 - `GET /api/admin/users`
 - `GET /api/admin/roles`
 - `GET /api/admin/security`
@@ -92,6 +94,8 @@ python main.py
   - `bash scripts/run_local_stack.sh`
 - 后端启动后，一键跑本地全流程冒烟：
   - `python3 scripts/local_smoke_test.py`
+- 部署后健康检查：
+  - `python3 scripts/deploy_self_check.py`
 
 ## 当前已打通的本地闭环
 

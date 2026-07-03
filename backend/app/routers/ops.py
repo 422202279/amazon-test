@@ -1,4 +1,7 @@
 import json
+import shutil
+from datetime import datetime
+from pathlib import Path
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -22,6 +25,12 @@ from app.services.product_importer import (
 )
 
 router = APIRouter(prefix="/ops", tags=["ops"])
+
+
+def _sqlite_db_path() -> Path | None:
+    if settings.database_url.startswith("sqlite:///./"):
+        return Path(settings.database_url.removeprefix("sqlite:///./"))
+    return None
 
 
 @router.get("/import-jobs")
@@ -193,3 +202,29 @@ def bootstrap_local_data(
     result["sales_history"] = import_sellersprite_sales_history(db, sales_path, 200)
     db.commit()
     return result
+
+
+@router.get("/backups")
+def list_backups(_: UserAccount = Depends(get_current_user)):
+    settings.backup_dir.mkdir(parents=True, exist_ok=True)
+    items = []
+    for path in sorted(settings.backup_dir.glob("*.sqlite3"), reverse=True):
+        items.append(
+            {
+                "name": path.name,
+                "size_bytes": path.stat().st_size,
+                "modified_at": datetime.fromtimestamp(path.stat().st_mtime).isoformat(sep=" ", timespec="seconds"),
+            }
+        )
+    return {"items": items}
+
+
+@router.post("/backups/create")
+def create_backup(_: UserAccount = Depends(get_current_user)):
+    db_path = _sqlite_db_path()
+    if not db_path or not db_path.exists():
+        return {"created": False, "message": "当前数据库文件不存在，无法备份。"}
+    settings.backup_dir.mkdir(parents=True, exist_ok=True)
+    target = settings.backup_dir / f"crossborder_monitor_{datetime.now().strftime('%Y%m%d_%H%M%S')}.sqlite3"
+    shutil.copy2(db_path, target)
+    return {"created": True, "file": str(target), "size_bytes": target.stat().st_size}

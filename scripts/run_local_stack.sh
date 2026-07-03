@@ -10,4 +10,5 @@ fi
 
 source .venv/bin/activate
 pip install -r requirements.txt
+mkdir -p data/uploads data/exports data/backups
 python main.py

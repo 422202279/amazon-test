@@ -1,4 +1,5 @@
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -8,8 +9,10 @@ from sqlalchemy.orm import sessionmaker
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from app.config import settings
 from app.database import Base
 from app.models.user_account import UserAccount
+from app.routers.health import health_detail
 from app.routers.admin import (
     UserPayload,
     create_user,
@@ -19,7 +22,7 @@ from app.routers.admin import (
     update_user,
 )
 from app.routers.auth import LoginPayload, login, me
-from app.routers.ops import deployment_profile, live_validation, source_capabilities
+from app.routers.ops import create_backup, deployment_profile, list_backups, live_validation, source_capabilities
 from app.security import ensure_default_admin
 
 
@@ -122,6 +125,29 @@ class OpsAdminTests(unittest.TestCase):
         self.assertEqual(payload["sellersprite_products"][0]["asin"], "B0TEST002")
         self.assertEqual(payload["store_links"][0]["site_code"], "UK")
         self.assertEqual(payload["http_checks"][0]["code"], 200)
+
+    def test_health_detail_exposes_directories(self):
+        payload = health_detail()
+
+        self.assertTrue(payload["ok"])
+        self.assertIn("backup_dir", payload)
+        self.assertIn("export_dir", payload)
+
+    def test_backup_endpoints_work_for_sqlite(self):
+        with self.session_factory() as db:
+            ensure_default_admin(db)
+            admin_user = db.query(UserAccount).filter(UserAccount.email == "admin@cb-monitor.local").one()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = Path(tmp_dir) / "test.sqlite3"
+            db_path.write_text("backup-smoke", encoding="utf-8")
+            backup_dir = Path(tmp_dir) / "backups"
+            with patch.object(settings, "database_url", f"sqlite:///./{db_path}"), patch.object(settings, "backup_dir", backup_dir):
+                created = create_backup(_=admin_user)
+                listed = list_backups(_=admin_user)
+
+        self.assertTrue(created["created"])
+        self.assertGreaterEqual(len(listed["items"]), 1)
 
 
 if __name__ == "__main__":

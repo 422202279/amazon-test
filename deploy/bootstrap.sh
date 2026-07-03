@@ -5,7 +5,7 @@ APP_DIR=${APP_DIR:-/opt/cb-monitor}
 PYTHON_BIN=${PYTHON_BIN:-python3}
 
 mkdir -p "$APP_DIR"
-mkdir -p "$APP_DIR/data/uploads" "$APP_DIR/data/exports"
+mkdir -p "$APP_DIR/data/uploads" "$APP_DIR/data/exports" "$APP_DIR/data/backups"
 
 cd "$APP_DIR"
 
