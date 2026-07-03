@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>产品开发 | CrossBorder Store Review Monitor Lite</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body data-page="product-development">
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">CB</div>
+          <div>
+            <strong>Review Monitor Lite</strong>
+            <p>跨境店铺评论监控</p>
+          </div>
+        </div>
+        <nav class="nav">
+          <a class="nav-item" href="./index.html">首页 Dashboard</a>
+          <a class="nav-item" href="./stores.html">店铺管理</a>
+          <a class="nav-item" href="./products.html">产品总表</a>
+          <a class="nav-item" href="./reviews.html">评论总表</a>
+          <a class="nav-item" href="./comparison.html">同款多店铺评论对比</a>
+          <a class="nav-item" href="./product-detail.html">产品详情</a>
+          <a class="nav-item active" href="./product-development.html">产品开发</a>
+          <a class="nav-item" href="./supplier-tasks.html">供应商整改任务</a>
+          <a class="nav-item" href="./reports.html">报告中心</a>
+          <a class="nav-item" href="./settings.html">设置</a>
+        </nav>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <h1>产品开发</h1>
+            <p>围绕差评提炼、改款建议、样品验证和版本迭代，服务产品开发工程师的核心工作流</p>
+          </div>
+          <div class="topbar-actions">
+            <button class="button ghost">手动更新开发数据</button>
+            <button class="button primary">新建改款项目</button>
+          </div>
+        </header>
+
+        <section class="filters dense">
+          <div class="filter-row">
+            <label>平台</label>
+            <select><option>全部</option><option>Amazon</option><option>Coupang</option><option>Naver</option></select>
+          </div>
+          <div class="filter-row">
+            <label>站点</label>
+            <select><option>全部</option><option>美国</option><option>英国</option><option>德国</option><option>日本</option><option>加拿大</option><option>法国</option><option>韩国</option></select>
+          </div>
+          <div class="filter-row">
+            <label>阶段</label>
+            <select><option>全部阶段</option><option>问题提炼</option><option>方案评估</option><option>样品验证</option><option>量产跟踪</option></select>
+          </div>
+          <div class="filter-row">
+            <label>证据周期</label>
+            <select><option>近 30 天</option><option>近 60 天</option><option>近 90 天</option><option>近半年</option></select>
+          </div>
+          <div class="filter-row filter-search wide">
+            <label>搜索</label>
+            <input type="text" placeholder="Parent ASIN / ASIN / SKU / 产品标题 / 问题关键词" />
+          </div>
+          <button class="button">筛选</button>
+        </section>
+
+        <section class="table-summary">
+          <div class="summary-pill">在研改款项目 18</div>
+          <div class="summary-pill">高优先问题 7</div>
+          <div class="summary-pill">待验证样品 5</div>
+          <div class="summary-pill warn">近30天新增集中差评 11</div>
+        </section>
+
+        <section class="two-col">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>问题提炼池</h2>
+                <p>按差评主题聚合问题，帮助你快速判断是否值得改款</p>
+              </div>
+              <span class="chip warn">开发优先级</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>产品</th>
+                    <th>站点覆盖</th>
+                    <th>近30天差评</th>
+                    <th>问题主题</th>
+                    <th>是否跨店共性</th>
+                    <th>建议</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>记忆棉人体工学坐垫<span class="cell-sub">B0DXSEAT01</span></td>
+                    <td>US / UK / KR</td>
+                    <td>12</td>
+                    <td>坐感塌陷 / 尺寸偏小</td>
+                    <td><span class="chip danger">是</span></td>
+                    <td>优先立项改款</td>
+                  </tr>
+                  <tr>
+                    <td>防漏便携咖啡杯<span class="cell-sub">B0DXMUG889</span></td>
+                    <td>UK / CA</td>
+                    <td>5</td>
+                    <td>杯盖渗水</td>
+                    <td><span class="chip warn">局部共性</span></td>
+                    <td>先做结构验证</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>开发看板</h2>
+                <p>把提炼问题一路推进到样品验证和量产跟踪</p>
+              </div>
+              <span class="chip success">版本迭代</span>
+            </div>
+            <div class="setting-list">
+              <div><strong>问题提炼</strong><span>沉淀评论证据、图片证据、站点差异、场景差异</span></div>
+              <div><strong>改款建议</strong><span>结构、材料、尺寸、包装、说明书、Listing 展示</span></div>
+              <div><strong>样品验证</strong><span>记录样品批次、测试结果、验证结论、是否通过</span></div>
+              <div><strong>版本迭代</strong><span>V1 旧版 / V2 改良版 / V3 量产版 追踪对比</span></div>
+              <div><strong>上线回看</strong><span>上线后对比评分、差评占比、退货反馈是否改善</span></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>改款项目总表</h2>
+              <p>产品开发工程师视角下的项目跟踪表，强调问题证据、建议方案、验证结论和版本收益</p>
+            </div>
+            <div class="segmented">
+              <button class="active">项目表</button>
+              <button>样品验证</button>
+              <button>版本收益</button>
+            </div>
+          </div>
+          <div class="table-wrap table-wide">
+            <table>
+              <thead>
+                <tr>
+                  <th>项目</th>
+                  <th>问题证据</th>
+                  <th>建议方案</th>
+                  <th>当前版本</th>
+                  <th>样品验证</th>
+                  <th>上线后目标</th>
+                  <th>责任人</th>
+                  <th>状态</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>坐垫改款 V2</td>
+                  <td>12 条差评 + 7 张带图证据</td>
+                  <td>提高内芯密度，放宽坐面尺寸，优化包装恢复说明</td>
+                  <td>V1 旧版</td>
+                  <td>待收改良样</td>
+                  <td>差评占比降到 5% 以下</td>
+                  <td>开发-JCC</td>
+                  <td><span class="status warn">方案评估中</span></td>
+                </tr>
+                <tr>
+                  <td>咖啡杯密封改款</td>
+                  <td>5 条渗水差评</td>
+                  <td>重做密封圈结构并验证横放场景</td>
+                  <td>V1 旧版</td>
+                  <td>样品测试中</td>
+                  <td>渗水类差评减少 70%</td>
+                  <td>开发-JCC</td>
+                  <td><span class="status success">验证中</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
