@@ -11,6 +11,19 @@ const stores = [
 ];
 
 const API_BASE = "http://127.0.0.1:8000/api";
+const siteLabelMap = {
+  US: "美国",
+  UK: "英国",
+  DE: "德国",
+  JP: "日本",
+  CA: "加拿大",
+  FR: "法国",
+  KR: "韩国",
+};
+
+const productSortState = { key: "", direction: "desc" };
+const reviewSortState = { key: "", direction: "desc" };
+const comparisonSortState = { key: "", direction: "desc" };
 
 let products = [
   { tone: "tone-1", name: "记忆棉人体工学坐垫", asin: "B0DXSEAT01", parentAsin: "B0DXSEAT00", sku: "CUS-01-US", store: "US Home Store", site: "美国", platform: "Amazon", category: "Home & Kitchen", price: "$29.99", sales: 642, salesAmount: "$19,253", reviews: 1284, newReviews: 36, rating: 4.1, imageReviews: 93, variantCount: 4, keywords: "seat cushion / office cushion", bsr: "#1,248 / #13", dimensions: "45 x 35 x 7 cm / 1.1 kg", fulfillment: "FBA", sellerCount: 2, buybox: "异常", buyboxSeller: "BestHouse US", adFlags: "SP / 视频", contentFlags: "A+ / 品牌店铺", negative: "12 条", issue: "坐感塌陷 / 尺寸偏小", supplier: "宁波舒垫工厂", launchDate: "2026-03-12", rectify: "处理中" },
@@ -97,6 +110,63 @@ function starString(count) {
 
 function thumbs(count = 3) {
   return Array.from({ length: count }, (_, index) => `<span class="thumb tone-${(index % 6) + 1}"></span>`).join("");
+}
+
+function localizeSite(site) {
+  return siteLabelMap[site] || site || "-";
+}
+
+function parseNumberLike(value) {
+  if (typeof value === "number") return value;
+  if (value === null || value === undefined) return Number.NEGATIVE_INFINITY;
+  const text = String(value).trim();
+  if (!text || text === "-") return Number.NEGATIVE_INFINITY;
+  const dateValue = Date.parse(text);
+  if (!Number.isNaN(dateValue) && /\d{4}-\d{2}-\d{2}/.test(text)) return dateValue;
+  const numeric = Number(text.replace(/,/g, "").replace(/[^\d.-]/g, ""));
+  if (!Number.isNaN(numeric) && /[\d]/.test(text)) return numeric;
+  return text.toLowerCase();
+}
+
+function compareValues(left, right, direction = "asc") {
+  const order = direction === "asc" ? 1 : -1;
+  const a = parseNumberLike(left);
+  const b = parseNumberLike(right);
+  if (typeof a === "number" && typeof b === "number") return (a - b) * order;
+  return String(a).localeCompare(String(b), "zh-CN") * order;
+}
+
+function sortIndicator(state, key) {
+  if (state.key !== key) return "";
+  return state.direction === "asc" ? " ▲" : " ▼";
+}
+
+function splitTerms(text) {
+  return String(text || "")
+    .split(/[\s,\n，]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function buildSearchParams(searchText) {
+  const params = new URLSearchParams();
+  const raw = String(searchText || "").trim();
+  if (!raw) return params;
+  const terms = splitTerms(raw);
+  if (terms.length > 1) {
+    params.set("identifiers", raw);
+  } else {
+    params.set("q", raw);
+    params.set("identifiers", raw);
+  }
+  return params;
+}
+
+function applySort(items, state, resolver) {
+  if (!state.key) return items.slice();
+  return items
+    .slice()
+    .sort((left, right) => compareValues(resolver(left, state.key), resolver(right, state.key), state.direction));
 }
 
 function renderReviewMedia(review, count = 3) {
@@ -223,13 +293,31 @@ function renderProducts() {
   if (!body || !head) return;
 
   const visibleColumns = productColumns.filter((column) => column.visible);
-  head.innerHTML = visibleColumns.map((column) => `<th data-col="${column.key}">${column.label}</th>`).join("");
+  head.innerHTML = visibleColumns.map((column) => `<th data-col="${column.key}">${column.label}${sortIndicator(productSortState, column.key)}</th>`).join("");
 
-  body.innerHTML = products.map((item) => `
+  const sortedProducts = applySort(products, productSortState, getProductSortValue);
+  body.innerHTML = sortedProducts.map((item) => `
     <tr>
       ${visibleColumns.map((column) => `<td data-col="${column.key}">${renderProductCell(item, column.key)}</td>`).join("")}
     </tr>
   `).join("");
+
+  head.querySelectorAll("th[data-col]").forEach((cell) => {
+    cell.style.cursor = "pointer";
+    cell.onclick = () => {
+      const key = cell.dataset.col || "";
+      if (!key) return;
+      if (productSortState.key === key) {
+        productSortState.direction = productSortState.direction === "asc" ? "desc" : "asc";
+      } else {
+        productSortState.key = key;
+        productSortState.direction = "desc";
+      }
+      renderProducts();
+    };
+  });
+
+  updateProductSummary(sortedProducts);
 }
 
 function renderProductColumnPicker() {
@@ -334,6 +422,54 @@ function renderProductCell(item, key) {
   return cells[key] ?? "";
 }
 
+function getProductSortValue(item, key) {
+  const values = {
+    product: item.name,
+    store: `${item.store} ${item.site}`,
+    platform: item.platform,
+    parentAsin: item.parentAsin,
+    category: item.category,
+    price: item.price,
+    sales: item.sales,
+    salesAmount: item.salesAmount,
+    reviews: item.reviews,
+    newReviews: item.newReviews,
+    rating: item.rating,
+    variantCount: item.variantCount,
+    keywords: item.keywords,
+    bsr: item.bsr,
+    dimensions: item.dimensions,
+    fulfillment: item.fulfillment,
+    sellerCount: item.sellerCount,
+    buybox: item.buybox,
+    buyboxSeller: item.buyboxSeller,
+    adFlags: item.adFlags,
+    contentFlags: item.contentFlags,
+    launchDate: item.launchDate,
+    negative: item.negative,
+    issue: item.issue,
+    supplier: item.supplier,
+    rectify: item.rectify,
+  };
+  return values[key] ?? "";
+}
+
+function updateProductSummary(items) {
+  const total = document.getElementById("products-summary-total");
+  const site = document.getElementById("products-summary-site");
+  const negative = document.getElementById("products-summary-negative");
+  const buybox = document.getElementById("products-summary-buybox");
+  const supplier = document.getElementById("products-summary-supplier");
+  if (!total || !site || !negative || !buybox || !supplier) return;
+
+  total.textContent = `产品数 ${items.length}`;
+  const activeSite = document.getElementById("products-site-filter")?.selectedOptions?.[0]?.textContent || "全部站点";
+  site.textContent = `${activeSite} ${items.length}`;
+  negative.textContent = `带新增差评 ${items.filter((item) => parseNumberLike(item.negative) > 0).length}`;
+  buybox.textContent = `购物车异常 ${items.filter((item) => item.buybox !== "正常").length}`;
+  supplier.textContent = `需供应商跟进 ${items.filter((item) => item.rectify !== "已整改" && item.rectify !== "已关闭").length}`;
+}
+
 function reorderProductColumns(draggingKey, targetKey) {
   const fromIndex = productColumns.findIndex((column) => column.key === draggingKey);
   const toIndex = productColumns.findIndex((column) => column.key === targetKey);
@@ -375,7 +511,8 @@ function renderReviews() {
   const body = document.getElementById("reviews-table");
   if (!body) return;
   if (reviewViewMode === "product" && reviews[0]?.recent_reviews) {
-    body.innerHTML = reviews.map((group) => `
+    const sortedGroups = applySort(reviews, reviewSortState, getReviewGroupSortValue);
+    body.innerHTML = sortedGroups.map((group) => `
       <tr>
         <td>
           <div class="review-meta">
@@ -404,9 +541,12 @@ function renderReviews() {
         <td><span class="status neutral">查看子评论</span></td>
       </tr>
     `).join("");
+    bindReviewSort();
+    updateReviewSummary(sortedGroups, true);
     return;
   }
-  body.innerHTML = reviews.map((review) => `
+  const sortedReviews = applySort(reviews, reviewSortState, getReviewSortValue);
+  body.innerHTML = sortedReviews.map((review) => `
     <tr>
       <td>
         <div class="review-meta">
@@ -435,6 +575,88 @@ function renderReviews() {
       <td><span class="status ${statusClass(review.rectify)}">${review.rectify}</span>${review.supplierTaskStatus ? `<span class="cell-sub">${review.supplierTaskStatus}${review.supplierTaskNotes ? ` · ${review.supplierTaskNotes}` : ""}</span>` : ""}</td>
     </tr>
   `).join("");
+  bindReviewSort();
+  updateReviewSummary(sortedReviews, false);
+}
+
+function getReviewSortValue(item, key) {
+  const values = {
+    id: item.reviewedAt || item.id,
+    product: `${item.product} ${item.store} ${item.asin}`,
+    site: `${item.site} ${item.platform}`,
+    stars: item.stars,
+    hasImage: item.hasImage ? 1 : 0,
+    content: item.content,
+    source: item.source,
+    issue: item.issue,
+    mood: item.mood,
+    feedback: item.feedback,
+    rectify: item.rectify,
+  };
+  return values[key] ?? "";
+}
+
+function getReviewGroupSortValue(item, key) {
+  const values = {
+    id: item.latest_reviewed_at || item.asin,
+    product: `${item.product_title} ${item.asin}`,
+    site: (item.sites || []).join(" "),
+    stars: item.recent_reviews?.[0]?.star_rating || 0,
+    hasImage: item.recent_reviews?.some((review) => review.has_images || review.review_images) ? 1 : 0,
+    content: (item.recent_reviews || []).map((review) => review.review_content || "").join(" "),
+    source: "聚合",
+    issue: (item.recent_reviews || []).map((review) => review.issue_category || "").join(" "),
+    mood: item.negative_review_count,
+    feedback: (item.supplier_task_statuses || []).join(" "),
+    rectify: (item.supplier_task_statuses || []).join(" "),
+  };
+  return values[key] ?? "";
+}
+
+function bindReviewSort() {
+  const headers = document.querySelectorAll(".review-master th[data-sort]");
+  if (!headers.length) return;
+  headers.forEach((header) => {
+    const key = header.dataset.sort || "";
+    header.style.cursor = "pointer";
+    const baseLabel = header.textContent.replace(/[▲▼]\s*$/, "").trim();
+    header.textContent = `${baseLabel}${sortIndicator(reviewSortState, key)}`;
+    header.onclick = () => {
+      if (!key) return;
+      if (reviewSortState.key === key) {
+        reviewSortState.direction = reviewSortState.direction === "asc" ? "desc" : "asc";
+      } else {
+        reviewSortState.key = key;
+        reviewSortState.direction = "desc";
+      }
+      renderReviews();
+    };
+  });
+}
+
+function updateReviewSummary(items, isGrouped) {
+  const total = document.getElementById("reviews-summary-total");
+  const negative = document.getElementById("reviews-summary-negative");
+  const media = document.getElementById("reviews-summary-media");
+  const feedback = document.getElementById("reviews-summary-feedback");
+  const recent = document.getElementById("reviews-summary-new");
+  if (!total || !negative || !media || !feedback || !recent) return;
+
+  if (isGrouped) {
+    const allReviews = items.flatMap((group) => group.recent_reviews || []);
+    total.textContent = `产品组 ${items.length}`;
+    negative.textContent = `聚合差评 ${items.reduce((sum, group) => sum + (group.negative_review_count || 0), 0)}`;
+    media.textContent = `含图/视频组 ${items.filter((group) => (group.recent_reviews || []).some((review) => review.has_images || review.review_images)).length}`;
+    feedback.textContent = `已生成任务组 ${items.filter((group) => (group.supplier_task_statuses || []).length).length}`;
+    recent.textContent = `示例评论 ${allReviews.length}`;
+    return;
+  }
+
+  total.textContent = `评论总数 ${items.length}`;
+  negative.textContent = `1~2 星 ${items.filter((item) => item.stars <= 2).length}`;
+  media.textContent = `带图评论 ${items.filter((item) => item.hasImage).length}`;
+  feedback.textContent = `未反馈供应商 ${items.filter((item) => item.feedback === "未反馈").length}`;
+  recent.textContent = `近期待处理 ${items.filter((item) => item.rectify !== "已关闭" && item.rectify !== "已整改").length}`;
 }
 
 function renderComparison() {
@@ -446,7 +668,9 @@ function renderComparison() {
   const table = document.getElementById("comparison-table");
   if (!cards || !scoreBars || !negativeBars || !volumeBars || !issueGrid || !table) return;
 
-  cards.innerHTML = comparisonData.map((item, index) => `
+  const sortedComparison = applySort(comparisonData, comparisonSortState, getComparisonSortValue);
+
+  cards.innerHTML = sortedComparison.map((item, index) => `
     <article class="comparison-card">
       <span class="chip ${index === 2 ? "danger" : "neutral"}">${item.store}</span>
       <h3>${item.site}站</h3>
@@ -461,14 +685,14 @@ function renderComparison() {
     </article>
   `).join("");
 
-  const maxVolume = Math.max(...comparisonData.map((i) => i.volume));
-  scoreBars.innerHTML = comparisonData.map((item) => `
+  const maxVolume = Math.max(...sortedComparison.map((i) => Number(i.volume) || 0), 1);
+  scoreBars.innerHTML = sortedComparison.map((item) => `
     <div class="bar-item"><span>${item.store}</span><div><i style="width:${item.score * 20}%"></i></div><strong>${item.score}</strong></div>
   `).join("");
-  negativeBars.innerHTML = comparisonData.map((item) => `
+  negativeBars.innerHTML = sortedComparison.map((item) => `
     <div class="bar-item"><span>${item.store}</span><div><i style="width:${item.negative * 7}%"></i></div><strong>${item.negative}%</strong></div>
   `).join("");
-  volumeBars.innerHTML = comparisonData.map((item) => `
+  volumeBars.innerHTML = sortedComparison.map((item) => `
     <div class="bar-item"><span>${item.store}</span><div><i style="width:${(item.volume / maxVolume) * 100}%"></i></div><strong>${item.volume}</strong></div>
   `).join("");
   issueGrid.innerHTML = [
@@ -478,7 +702,7 @@ function renderComparison() {
     ["物流破损", "仅 DE 站集中"],
   ].map(([issue, note]) => `<div class="issue-pill"><strong>${issue}</strong><span>${note}</span></div>`).join("");
 
-  table.innerHTML = comparisonData.map((item) => `
+  table.innerHTML = sortedComparison.map((item) => `
     <tr>
       <td>${item.store}</td>
       <td>${item.site}</td>
@@ -492,6 +716,29 @@ function renderComparison() {
       <td>${item.action}</td>
     </tr>
   `).join("");
+
+  document.querySelectorAll("#comparison-table").forEach(() => {
+    document.querySelectorAll("th[data-sort]").forEach((header) => {
+      const key = header.dataset.sort || "";
+      const baseLabel = header.textContent.replace(/[▲▼]\s*$/, "").trim();
+      header.textContent = `${baseLabel}${sortIndicator(comparisonSortState, key)}`;
+      header.style.cursor = "pointer";
+      header.onclick = () => {
+        if (!key) return;
+        if (comparisonSortState.key === key) {
+          comparisonSortState.direction = comparisonSortState.direction === "asc" ? "desc" : "asc";
+        } else {
+          comparisonSortState.key = key;
+          comparisonSortState.direction = "desc";
+        }
+        renderComparison();
+      };
+    });
+  });
+}
+
+function getComparisonSortValue(item, key) {
+  return item[key] ?? "";
 }
 
 function renderDetail() {
@@ -592,8 +839,12 @@ document.addEventListener("DOMContentLoaded", () => {
   renderTasks();
   renderReports();
   hydrateLiveData();
+  hydrateScheduleSettings();
+  bindProductFilters();
+  bindReviewFilters();
   bindReviewViewSwitch();
   bindComparisonSubmit();
+  bindManualRefresh();
 });
 
 function bindReviewViewSwitch() {
@@ -613,13 +864,49 @@ function bindReviewViewSwitch() {
   });
 }
 
+function bindProductFilters() {
+  const button = document.getElementById("products-apply-button");
+  if (!button) return;
+  button.addEventListener("click", async () => {
+    await hydrateProducts();
+  });
+}
+
+function bindReviewFilters() {
+  const button = document.getElementById("reviews-apply-button");
+  if (!button) return;
+  button.addEventListener("click", async () => {
+    await hydrateReviews();
+  });
+}
+
 function bindComparisonSubmit() {
   const page = document.body.dataset.page;
   if (page !== "comparison") return;
-  const button = Array.from(document.querySelectorAll(".filters .button")).find((item) => item.textContent.includes("开始对比"));
+  const button = document.getElementById("comparison-apply-button");
   if (!button) return;
   button.addEventListener("click", async () => {
     await hydrateComparison();
+  });
+}
+
+function bindManualRefresh() {
+  const buttons = document.querySelectorAll("[data-refresh-target]");
+  if (!buttons.length) return;
+  buttons.forEach((button) => {
+    button.addEventListener("click", async () => {
+      const target = button.getAttribute("data-refresh-target");
+      if (!target) return;
+      const status = document.getElementById("manual-refresh-status");
+      if (status) status.textContent = `正在提交 ${target} 手动更新任务...`;
+      try {
+        const params = new URLSearchParams({ target, source_mode: "standard" });
+        const data = await fetchJson(`/ops/manual-refresh?${params.toString()}`, { method: "POST" });
+        if (status) status.textContent = `${target}：${data.message}`;
+      } catch (error) {
+        if (status) status.textContent = `${target}：提交失败，当前仍可先使用导入方式补数。`;
+      }
+    });
   });
 }
 
@@ -631,15 +918,23 @@ async function hydrateLiveData() {
   if (page === "supplier-tasks") await hydrateTasks();
 }
 
-async function fetchJson(path) {
-  const response = await fetch(`${API_BASE}${path}`);
+async function fetchJson(path, options = undefined) {
+  const response = await fetch(`${API_BASE}${path}`, options);
   if (!response.ok) throw new Error(`Failed to fetch ${path}`);
   return response.json();
 }
 
 async function hydrateProducts() {
   try {
-    const data = await fetchJson("/products?limit=100");
+    const params = buildSearchParams(document.getElementById("products-search-input")?.value);
+    params.set("limit", "100");
+    const platform = document.getElementById("products-platform-filter")?.value;
+    const siteCode = document.getElementById("products-site-filter")?.value;
+    const storeName = document.getElementById("products-store-filter")?.value;
+    if (platform) params.set("platform", platform);
+    if (siteCode) params.set("site_code", siteCode);
+    if (storeName) params.set("store_name", storeName);
+    const data = await fetchJson(`/products?${params.toString()}`);
     if (!data.items?.length) return;
     products = data.items.map(mapProductFromApi);
     renderProducts();
@@ -651,12 +946,22 @@ async function hydrateProducts() {
 async function hydrateReviews() {
   try {
     const mode = reviewViewMode === "negative" ? "timeline" : reviewViewMode;
-    const data = await fetchJson(`/reviews?limit=100&view_mode=${mode}`);
+    const params = buildSearchParams(document.getElementById("reviews-search-input")?.value);
+    params.set("limit", "100");
+    params.set("view_mode", mode);
+    const platform = document.getElementById("reviews-platform-filter")?.value;
+    const siteCode = document.getElementById("reviews-site-filter")?.value;
+    const storeName = document.getElementById("reviews-store-filter")?.value;
+    if (platform) params.set("platform", platform);
+    if (siteCode) params.set("site_code", siteCode);
+    if (storeName) params.set("store_name", storeName);
+    const data = await fetchJson(`/reviews?${params.toString()}`);
     if (!data.items?.length) return;
     reviews = mode === "product" ? data.items : data.items.map(mapReviewFromApi);
     if (reviewViewMode === "negative") {
       reviews = reviews.filter((item) => item.stars <= 3);
     }
+    reviews = filterReviewsLocally(reviews, mode === "product");
     renderReviews();
   } catch (error) {
     console.warn("Reviews API unavailable, fallback to mock data", error);
@@ -665,11 +970,31 @@ async function hydrateReviews() {
 
 async function hydrateComparison() {
   try {
-    const textarea = document.querySelector("textarea");
+    const textarea = document.getElementById("comparison-input");
     const raw = textarea?.value?.trim() || "B0DXSEAT01";
-    const data = await fetchJson(`/products/compare?identifiers=${encodeURIComponent(raw)}&limit=20`);
+    const params = new URLSearchParams({ limit: "20" });
+    const mode = document.getElementById("comparison-mode")?.value || "parent";
+    const scope = document.getElementById("comparison-scope")?.value || "";
+    const period = document.getElementById("comparison-period")?.value || "all";
+    if (mode === "parent") {
+      params.set("parent_asin", splitTerms(raw)[0] || raw);
+    } else if (mode === "asin") {
+      params.set("asins", raw);
+    } else if (mode === "sku") {
+      params.set("skus", raw);
+    } else {
+      params.set("identifiers", raw);
+    }
+    if (scope && scope !== "all") params.set("platform", scope);
+    const data = await fetchJson(`/products/compare?${params.toString()}`);
     if (!data.items?.length) return;
     comparisonData = data.items.map(mapComparisonFromApi);
+    const note = document.getElementById("comparison-notes");
+    if (note) {
+      note.textContent = period === "all"
+        ? (data.notes || "当前指标已按系统支持范围返回")
+        : `${period} 视图已切换；${data.notes || "销量主字段仍以近30天快照为主"}`;
+    }
     renderComparison();
   } catch (error) {
     console.warn("Comparison API unavailable, fallback to mock data", error);
@@ -687,6 +1012,59 @@ async function hydrateTasks() {
   }
 }
 
+async function hydrateScheduleSettings() {
+  const defaultTimes = document.getElementById("schedule-default-times");
+  const maxTimes = document.getElementById("schedule-max-times");
+  if (!defaultTimes || !maxTimes) return;
+  try {
+    const data = await fetchJson("/ops/schedule-settings");
+    defaultTimes.textContent = `${(data.default_times || []).join(" / ")} 自动更新产品、趋势、报告缓存`;
+    maxTimes.textContent = `最多 ${data.max_schedule_times || 3} 个，建议只加重点时段，不做高频轮询`;
+  } catch (error) {
+    console.warn("Schedule settings API unavailable, fallback to static text", error);
+  }
+}
+
+function filterReviewsLocally(items, isGrouped) {
+  const stars = document.getElementById("reviews-stars-filter")?.value || "";
+  const media = document.getElementById("reviews-media-filter")?.value || "";
+  const issue = document.getElementById("reviews-issue-filter")?.value || "";
+  const feedback = document.getElementById("reviews-feedback-filter")?.value || "";
+  const period = document.getElementById("reviews-period-filter")?.value || "all";
+
+  if (isGrouped) {
+    return items.filter((group) => {
+      const latest = group.latest_reviewed_at ? Date.parse(group.latest_reviewed_at) : null;
+      if (period !== "all" && latest && !matchesPeriod(latest, period)) return false;
+      if (issue && !(group.recent_reviews || []).some((review) => review.issue_category === issue)) return false;
+      if (media === "with-media" && !(group.recent_reviews || []).some((review) => review.has_images || review.review_images)) return false;
+      if (media === "without-media" && (group.recent_reviews || []).some((review) => review.has_images || review.review_images)) return false;
+      return true;
+    });
+  }
+
+  return items.filter((item) => {
+    if (stars === "1-2" && item.stars > 2) return false;
+    if (stars === "3" && item.stars !== 3) return false;
+    if (stars === "4-5" && item.stars < 4) return false;
+    if (media === "with-media" && !item.hasImage) return false;
+    if (media === "without-media" && item.hasImage) return false;
+    if (issue && item.issue !== issue) return false;
+    if (feedback && item.feedback !== feedback) return false;
+    if (period !== "all" && item.reviewedAt && !matchesPeriod(Date.parse(item.reviewedAt), period)) return false;
+    return true;
+  });
+}
+
+function matchesPeriod(timestamp, period) {
+  if (!timestamp || Number.isNaN(timestamp)) return true;
+  const dayMap = { "30d": 30, "60d": 60, "90d": 90, "180d": 180 };
+  const days = dayMap[period];
+  if (!days) return true;
+  const diffMs = Date.now() - timestamp;
+  return diffMs <= days * 24 * 60 * 60 * 1000;
+}
+
 function mapProductFromApi(item) {
   return {
     tone: "tone-1",
@@ -695,7 +1073,7 @@ function mapProductFromApi(item) {
     parentAsin: item.parent_asin || "-",
     sku: item.sku || item.department_item_no || "-",
     store: item.store_name || "未识别店铺",
-    site: item.site_code || "-",
+    site: localizeSite(item.site_code),
     platform: item.platform || "-",
     category: item.category_name || item.category_path || "-",
     price: item.price_amount ? `${item.price_currency || ""}${item.price_amount}` : "-",
@@ -730,7 +1108,7 @@ function mapReviewFromApi(item) {
     title: item.review_title || "无标题评论",
     product: item.product_title || "未命名产品",
     store: item.store_name || "未识别店铺",
-    site: item.site_code || "-",
+    site: localizeSite(item.site_code),
     platform: item.platform || "-",
     stars: item.star_rating || 3,
     hasImage: Boolean(item.has_images || item.review_images),
@@ -744,6 +1122,7 @@ function mapReviewFromApi(item) {
     rectify: item.rectification_status || "待反馈",
     source: item.source_type || "导入",
     asin: item.asin || "-",
+    reviewedAt: item.reviewed_at || "",
     supplierTaskCode: item.supplier_task_code || "",
     supplierTaskStatus: item.supplier_task_status || "",
     supplierTaskNotes: item.supplier_task_notes || "",
@@ -753,7 +1132,7 @@ function mapReviewFromApi(item) {
 function mapComparisonFromApi(item) {
   return {
     store: item.store_name || "未识别店铺",
-    site: item.site_code || "-",
+    site: localizeSite(item.site_code),
     sales: item.recent_sales ?? "-",
     salesAmount: item.recent_revenue ? `${item.price_currency || ""}${item.recent_revenue}` : "-",
     score: item.rating ?? "-",

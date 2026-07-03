@@ -45,49 +45,49 @@
         <section class="filters dense reviews-filters">
           <div class="filter-row">
             <label>平台</label>
-            <select><option>全部平台</option><option>Amazon</option><option>Coupang</option><option>Naver</option></select>
+            <select id="reviews-platform-filter"><option value="">全部平台</option><option value="Amazon">Amazon</option><option value="Coupang">Coupang</option><option value="Naver">Naver</option></select>
           </div>
           <div class="filter-row">
             <label>站点</label>
-            <select><option>全部站点</option><option>美国</option><option>英国</option><option>德国</option><option>日本</option><option>加拿大</option><option>法国</option><option>韩国</option></select>
+            <select id="reviews-site-filter"><option value="">全部站点</option><option value="US">美国</option><option value="UK">英国</option><option value="DE">德国</option><option value="JP">日本</option><option value="CA">加拿大</option><option value="FR">法国</option><option value="KR">韩国</option></select>
           </div>
           <div class="filter-row">
             <label>店铺</label>
-            <select><option>全部店铺</option><option>US Home</option><option>JP Kitchen</option></select>
+            <select id="reviews-store-filter"><option value="">全部店铺</option><option value="US Home Store">US Home Store</option><option value="UK Living">UK Living</option><option value="DE Ordnung">DE Ordnung</option><option value="JP Kitchen">JP Kitchen</option><option value="CA Comfort">CA Comfort</option><option value="FR Maison">FR Maison</option><option value="Coupang Seoul">Coupang Seoul</option><option value="Naver Living">Naver Living</option></select>
           </div>
           <div class="filter-row">
             <label>星级</label>
-            <select><option>1~5 星全部</option><option>仅 1~2 星</option><option>仅 3 星</option><option>仅 4~5 星</option></select>
+            <select id="reviews-stars-filter"><option value="">1~5 星全部</option><option value="1-2">仅 1~2 星</option><option value="3">仅 3 星</option><option value="4-5">仅 4~5 星</option></select>
           </div>
           <div class="filter-row">
             <label>带图</label>
-            <select><option>全部</option><option>带图评论</option><option>无图评论</option></select>
+            <select id="reviews-media-filter"><option value="">全部</option><option value="with-media">带图评论</option><option value="without-media">无图评论</option></select>
           </div>
           <div class="filter-row">
             <label>问题分类</label>
-            <select><option>全部分类</option><option>尺寸问题</option><option>质量问题</option><option>包装破损</option><option>描述不符</option></select>
+            <select id="reviews-issue-filter"><option value="">全部分类</option><option value="尺寸问题">尺寸问题</option><option value="质量问题">质量问题</option><option value="包装破损">包装破损</option><option value="描述不符">描述不符</option><option value="使用效果差">使用效果差</option><option value="掉色">掉色</option><option value="异味">异味</option></select>
           </div>
           <div class="filter-row">
             <label>供应商反馈</label>
-            <select><option>全部</option><option>已反馈</option><option>未反馈</option></select>
+            <select id="reviews-feedback-filter"><option value="">全部</option><option value="已反馈">已反馈</option><option value="未反馈">未反馈</option></select>
           </div>
           <div class="filter-row">
             <label>统计周期</label>
-            <select><option>全部</option><option>近 30 天</option><option>近 60 天</option><option>近 90 天</option><option>近半年</option></select>
+            <select id="reviews-period-filter"><option value="all">全部</option><option value="30d">近 30 天</option><option value="60d">近 60 天</option><option value="90d">近 90 天</option><option value="180d">近半年</option></select>
           </div>
           <div class="filter-row filter-search wide">
             <label>搜索</label>
-            <input type="text" placeholder="评论内容 / 评论人 / ASIN / SKU / 标题；支持多 ASIN / SKU，逗号、中文逗号、换行或空格分隔" />
+            <input id="reviews-search-input" type="text" placeholder="评论内容 / 评论人 / ASIN / SKU / 标题；支持多 ASIN / SKU，逗号、中文逗号、换行或空格分隔" />
           </div>
-          <button class="button">查询</button>
+          <button class="button" id="reviews-apply-button">查询</button>
         </section>
 
         <section class="table-summary">
-          <div class="summary-pill">评论总数 3,482</div>
-          <div class="summary-pill">1~2 星 214</div>
-          <div class="summary-pill">带图评论 592</div>
-          <div class="summary-pill warn">未反馈供应商 67</div>
-          <div class="summary-pill">新增评论 145</div>
+          <div class="summary-pill" id="reviews-summary-total">评论总数 3,482</div>
+          <div class="summary-pill" id="reviews-summary-negative">1~2 星 214</div>
+          <div class="summary-pill" id="reviews-summary-media">带图评论 592</div>
+          <div class="summary-pill warn" id="reviews-summary-feedback">未反馈供应商 67</div>
+          <div class="summary-pill" id="reviews-summary-new">新增评论 145</div>
           <div class="summary-pill"><a href="./templates/review-import-template.xlsx">下载评论导入模板</a></div>
         </section>
 
@@ -107,18 +107,18 @@
             <table>
               <thead>
                 <tr>
-                  <th>评论</th>
-                  <th>产品 / 店铺</th>
-                  <th>站点 / 平台</th>
-                  <th>星级</th>
-                  <th>评论图片</th>
-                  <th>评论内容</th>
+                  <th data-sort="id">评论</th>
+                  <th data-sort="product">产品 / 店铺</th>
+                  <th data-sort="site">站点 / 平台</th>
+                  <th data-sort="stars">星级</th>
+                  <th data-sort="hasImage">评论图片</th>
+                  <th data-sort="content">评论内容</th>
                   <th>产品链接</th>
-                  <th>数据来源</th>
-                  <th>问题分类</th>
-                  <th>情绪</th>
-                  <th>是否反馈供应商</th>
-                  <th>整改状态</th>
+                  <th data-sort="source">数据来源</th>
+                  <th data-sort="issue">问题分类</th>
+                  <th data-sort="mood">情绪</th>
+                  <th data-sort="feedback">是否反馈供应商</th>
+                  <th data-sort="rectify">整改状态</th>
                 </tr>
               </thead>
               <tbody id="reviews-table"></tbody>

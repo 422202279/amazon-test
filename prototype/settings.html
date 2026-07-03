@@ -116,11 +116,17 @@
               <span class="chip success">低频调度</span>
             </div>
             <div class="setting-list">
-              <div><strong>默认任务</strong><span>06:00 自动更新产品、趋势、报告缓存</span></div>
-              <div><strong>可自定义时间点</strong><span>最多 3 个，建议只加重点时段，不做高频轮询</span></div>
+              <div><strong>默认任务</strong><span id="schedule-default-times">06:00 自动更新产品、趋势、报告缓存</span></div>
+              <div><strong>可自定义时间点</strong><span id="schedule-max-times">最多 3 个，建议只加重点时段，不做高频轮询</span></div>
               <div><strong>手动更新</strong><span>支持按产品 / 评论 / 对比缓存单独触发</span></div>
               <div><strong>服务器建议</strong><span>2C2G 最低配只适合低频任务，不建议高频抓取</span></div>
             </div>
+            <div class="compare-pool">
+              <button class="button ghost" data-refresh-target="products">手动更新产品</button>
+              <button class="button ghost" data-refresh-target="reviews">手动更新评论</button>
+              <button class="button ghost" data-refresh-target="comparison">手动更新对比缓存</button>
+            </div>
+            <p class="cell-sub" id="manual-refresh-status">当前未触发手动更新。</p>
           </div>
 
           <div class="panel">

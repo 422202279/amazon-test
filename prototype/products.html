@@ -45,15 +45,15 @@
         <section class="filters dense">
           <div class="filter-row">
             <label>平台</label>
-            <select><option>全部</option><option>Amazon</option><option>Coupang</option><option>Naver</option></select>
+            <select id="products-platform-filter"><option value="">全部</option><option value="Amazon">Amazon</option><option value="Coupang">Coupang</option><option value="Naver">Naver</option></select>
           </div>
           <div class="filter-row">
             <label>站点</label>
-            <select><option>全部</option><option>美国</option><option>英国</option><option>德国</option><option>日本</option><option>加拿大</option><option>法国</option><option>韩国</option></select>
+            <select id="products-site-filter"><option value="">全部</option><option value="US">美国</option><option value="UK">英国</option><option value="DE">德国</option><option value="JP">日本</option><option value="CA">加拿大</option><option value="FR">法国</option><option value="KR">韩国</option></select>
           </div>
           <div class="filter-row">
             <label>店铺</label>
-            <select><option>全部店铺</option><option>US Home</option><option>UK Living</option></select>
+            <select id="products-store-filter"><option value="">全部店铺</option><option value="US Home Store">US Home Store</option><option value="UK Living">UK Living</option><option value="DE Ordnung">DE Ordnung</option><option value="JP Kitchen">JP Kitchen</option><option value="CA Comfort">CA Comfort</option><option value="FR Maison">FR Maison</option><option value="Coupang Seoul">Coupang Seoul</option><option value="Naver Living">Naver Living</option></select>
           </div>
           <div class="filter-row">
             <label>购物车</label>
@@ -69,21 +69,21 @@
           </div>
           <div class="filter-row">
             <label>统计周期</label>
-            <select><option>全部</option><option>近 30 天</option><option>近 60 天</option><option>近 90 天</option><option>近半年</option></select>
+            <select id="products-period-filter"><option value="all">全部</option><option value="30d">近 30 天</option><option value="60d">近 60 天</option><option value="90d">近 90 天</option><option value="180d">近半年</option></select>
           </div>
           <div class="filter-row filter-search wide">
             <label>搜索</label>
-            <input type="text" placeholder="ASIN / SKU / 标题 / 品牌 / 流量词；支持多 ASIN / SKU，逗号、中文逗号、换行或空格分隔" />
+            <input id="products-search-input" type="text" placeholder="ASIN / SKU / 标题 / 品牌 / 流量词；支持多 ASIN / SKU，逗号、中文逗号、换行或空格分隔" />
           </div>
-          <button class="button">应用筛选</button>
+          <button class="button" id="products-apply-button">应用筛选</button>
         </section>
 
         <section class="table-summary">
-          <div class="summary-pill">产品数 126</div>
-          <div class="summary-pill">美国站 34</div>
-          <div class="summary-pill">带新增差评 18</div>
-          <div class="summary-pill warn">购物车丢失 6</div>
-          <div class="summary-pill">需供应商跟进 21</div>
+          <div class="summary-pill" id="products-summary-total">产品数 126</div>
+          <div class="summary-pill" id="products-summary-site">美国站 34</div>
+          <div class="summary-pill" id="products-summary-negative">带新增差评 18</div>
+          <div class="summary-pill warn" id="products-summary-buybox">购物车丢失 6</div>
+          <div class="summary-pill" id="products-summary-supplier">需供应商跟进 21</div>
           <div class="summary-pill"><a href="./templates/product-import-template.xlsx">下载产品导入模板</a></div>
         </section>
 
