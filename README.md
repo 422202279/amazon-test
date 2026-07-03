@@ -38,6 +38,7 @@
 - `POST /api/ops/manual-refresh`
 - `GET /api/ops/source-capabilities`
 - `GET /api/ops/deployment-profile`
+- `GET /api/ops/live-validation`
 - `GET /api/admin/users`
 - `GET /api/admin/roles`
 - `GET /api/admin/security`

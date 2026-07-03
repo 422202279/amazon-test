@@ -8,6 +8,11 @@ from app.database import get_db
 from app.models.import_job import ImportJob
 from app.serializers import to_dict
 from app.services.data_quality import build_data_quality_summary
+from app.services.product_importer import (
+    preview_internal_store_links,
+    preview_internal_store_products,
+    preview_sellersprite_products,
+)
 
 router = APIRouter(prefix="/ops", tags=["ops"])
 
@@ -106,3 +111,56 @@ def deployment_profile():
         "traffic_strategy": "默认低频任务，每天 06:00 跑一次；韩国站不做高频自动抓取",
         "notes": "当前方案按最低成本设计，不依赖额外付费数据库或消息队列。",
     }
+
+
+@router.get("/live-validation")
+def live_validation():
+    internal_path = "/Users/jcc_mac/Documents/A新禾亚马逊一部/产品信息汇总表 新系统一些SKU加点版本_在售版本汇总.xlsx"
+    sellersprite_path = "/Users/jcc_mac/Downloads/Product-CA-20260702.xlsx"
+    payload = {
+        "internal_products": [],
+        "sellersprite_products": [],
+        "store_links": [],
+        "http_checks": [
+            {
+                "target": "Amazon 商品页",
+                "status": "可低频校验",
+                "code": 200,
+                "notes": "适合校验标题、ASIN、评分、Review数、链接有效性。",
+            },
+            {
+                "target": "Coupang 商品页",
+                "status": "不适合作为云端自动主链路",
+                "code": 403,
+                "notes": "当前公开页访问受限，建议人工采集或卖家 API。",
+            },
+            {
+                "target": "Naver 商品页",
+                "status": "不适合作为云端自动主链路",
+                "code": 429,
+                "notes": "当前公开页频控明显，建议人工采集或 Commerce API。",
+            },
+        ],
+        "verified_fields": {
+            "internal_products": ["店铺", "ASIN", "标题", "产品链接", "评分", "Review数", "近30天销量", "工厂"],
+            "sellersprite_products": ["店铺", "ASIN", "标题", "产品链接", "价格", "评分", "Review数"],
+            "store_links": ["平台", "站点", "店铺名", "店铺链接"],
+        },
+    }
+
+    try:
+        payload["internal_products"] = preview_internal_store_products(internal_path, limit=2)
+    except Exception as exc:  # pragma: no cover - best effort preview
+        payload["internal_products_error"] = str(exc)
+
+    try:
+        payload["sellersprite_products"] = preview_sellersprite_products(sellersprite_path, limit=2)
+    except Exception as exc:  # pragma: no cover - best effort preview
+        payload["sellersprite_products_error"] = str(exc)
+
+    try:
+        payload["store_links"] = preview_internal_store_links(internal_path)[:2]
+    except Exception as exc:  # pragma: no cover - best effort preview
+        payload["store_links_error"] = str(exc)
+
+    return payload

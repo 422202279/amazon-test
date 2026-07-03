@@ -182,6 +182,51 @@
             </ul>
           </div>
         </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>真实数据最小验证</h2>
+              <p>优先确认当前系统已经稳定拿到哪些真实字段，避免后续分析建立在假设上</p>
+            </div>
+            <span class="chip success">首页直看</span>
+          </div>
+          <div class="two-col">
+            <div>
+              <div class="setting-list" id="dashboard-live-fields">
+                <div><strong>内部产品表</strong><span>店铺 / ASIN / 标题 / 链接 / 评分 / Review数</span></div>
+                <div><strong>卖家精灵产品表</strong><span>店铺 / ASIN / 标题 / 链接 / 价格 / 评分</span></div>
+                <div><strong>店铺链接表</strong><span>平台 / 站点 / 店铺链接</span></div>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>验证来源</th>
+                      <th>样本</th>
+                      <th>关键字段</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dashboard-live-samples"></tbody>
+                </table>
+              </div>
+            </div>
+            <div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>公开页来源</th>
+                      <th>状态</th>
+                      <th>说明</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dashboard-http-checks"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
       </main>
     </div>
     <script src="./app.js"></script>

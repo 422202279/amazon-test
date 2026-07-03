@@ -894,6 +894,61 @@ function renderSourceCapabilities(items) {
   `).join("");
 }
 
+function renderLiveValidation(payload) {
+  const sampleTable = document.getElementById("dashboard-live-samples");
+  const httpTable = document.getElementById("dashboard-http-checks");
+  const fieldsBox = document.getElementById("dashboard-live-fields");
+  if (!sampleTable || !httpTable || !fieldsBox) return;
+
+  const sampleRows = [];
+  (payload.internal_products || []).forEach((item) => {
+    sampleRows.push({
+      source: "内部产品表",
+      sample: `${item.store_name || "-"} / ${item.asin || "-"} / ${item.title || "-"}`,
+      fields: [item.product_url ? "链接" : "", item.rating ? "评分" : "", item.review_count ? "Review数" : "", item.monthly_sales ? "近30天销量" : ""]
+        .filter(Boolean)
+        .join(" / "),
+    });
+  });
+  (payload.sellersprite_products || []).forEach((item) => {
+    sampleRows.push({
+      source: "卖家精灵产品表",
+      sample: `${item.store_name || "-"} / ${item.asin || "-"} / ${item.title || "-"}`,
+      fields: [item.product_url ? "链接" : "", item.price_amount ? "价格" : "", item.rating ? "评分" : "", item.review_count ? "Review数" : ""]
+        .filter(Boolean)
+        .join(" / "),
+    });
+  });
+  (payload.store_links || []).forEach((item) => {
+    sampleRows.push({
+      source: "店铺链接表",
+      sample: `${item.platform || "-"} / ${item.site_code || "-"} / ${item.store_name || "-"}`,
+      fields: item.store_page_url ? "店铺链接" : "待补链接",
+    });
+  });
+
+  sampleTable.innerHTML = sampleRows.map((item) => `
+    <tr>
+      <td>${item.source}</td>
+      <td>${item.sample}</td>
+      <td>${item.fields || "待补字段"}</td>
+    </tr>
+  `).join("");
+
+  httpTable.innerHTML = (payload.http_checks || []).map((item) => `
+    <tr>
+      <td>${item.target}</td>
+      <td><span class="chip ${item.code === 200 ? "success" : "warn"}">${item.status}</span></td>
+      <td>${item.notes}</td>
+    </tr>
+  `).join("");
+
+  const verifiedFields = payload.verified_fields || {};
+  fieldsBox.innerHTML = Object.entries(verifiedFields).map(([key, values]) => `
+    <div><strong>${key === "internal_products" ? "内部产品表" : key === "sellersprite_products" ? "卖家精灵产品表" : "店铺链接表"}</strong><span>${values.join(" / ")}</span></div>
+  `).join("");
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   restoreProductColumns();
   renderDashboard();
@@ -1097,12 +1152,16 @@ async function hydrateScheduleSettings() {
 
 async function hydrateOpsInsights() {
   const page = document.body.dataset.page;
-  if (page !== "settings") return;
+  if (!["settings", "dashboard"].includes(page)) return;
   try {
-    const [sources, deployment] = await Promise.all([
+    const requests = [
       fetchJson("/ops/source-capabilities"),
       fetchJson("/ops/deployment-profile"),
-    ]);
+    ];
+    if (page === "dashboard") {
+      requests.push(fetchJson("/ops/live-validation"));
+    }
+    const [sources, deployment, liveValidation] = await Promise.all(requests);
     if (sources.items?.length) {
       renderSourceCapabilities(sources.items);
     }
@@ -1115,6 +1174,9 @@ async function hydrateOpsInsights() {
         <div><strong>证书</strong><span>${deployment.ssl_plan || "Let's Encrypt 免费证书"}</span></div>
         <div><strong>图片策略</strong><span>${deployment.storage_strategy || "缩略图优先，视频只留封面图和链接"}</span></div>
       `;
+    }
+    if (page === "dashboard" && liveValidation) {
+      renderLiveValidation(liveValidation);
     }
   } catch (error) {
     console.warn("Ops insight API unavailable, fallback to static settings copy", error);
