@@ -59,10 +59,10 @@ const reviews = [
 ];
 
 const comparisonData = [
-  { store: "US Home Store", site: "美国", score: 4.1, negative: 8.6, volume: 1284, imageReviews: 93, top3: "坐感塌陷 / 尺寸偏小 / 回弹慢", action: "调整内芯密度与文案说明" },
-  { store: "UK Living", site: "英国", score: 4.3, negative: 5.1, volume: 816, imageReviews: 48, top3: "尺寸偏小 / 包装褶皱 / 回弹慢", action: "优化尺寸图与包装说明" },
-  { store: "DE Ordnung", site: "德国", score: 3.8, negative: 11.9, volume: 604, imageReviews: 52, top3: "坐感塌陷 / 描述不符 / 物流破损", action: "排查批次与物流包装" },
-  { store: "Coupang Seoul", site: "韩国", score: 4.0, negative: 7.4, volume: 472, imageReviews: 37, top3: "尺寸偏小 / 坐感偏硬 / 缝线粗糙", action: "本地化尺寸说明，抽检缝线" }
+  { store: "US Home Store", site: "美国", sales: 642, salesAmount: "$19,253", score: 4.1, negative: 8.6, volume: 1284, imageReviews: 93, top3: "坐感塌陷 / 尺寸偏小 / 回弹慢", action: "调整内芯密度与文案说明" },
+  { store: "UK Living", site: "英国", sales: 411, salesAmount: "£7,768", score: 4.3, negative: 5.1, volume: 816, imageReviews: 48, top3: "尺寸偏小 / 包装褶皱 / 回弹慢", action: "优化尺寸图与包装说明" },
+  { store: "DE Ordnung", site: "德国", sales: 372, salesAmount: "€8,742", score: 3.8, negative: 11.9, volume: 604, imageReviews: 52, top3: "坐感塌陷 / 描述不符 / 物流破损", action: "排查批次与物流包装" },
+  { store: "Coupang Seoul", site: "韩国", sales: 295, salesAmount: "₩8,410,000", score: 4.0, negative: 7.4, volume: 472, imageReviews: 37, top3: "尺寸偏小 / 坐感偏硬 / 缝线粗糙", action: "本地化尺寸说明，抽检缝线" }
 ];
 
 const tasks = [
@@ -411,10 +411,12 @@ function renderComparison() {
       <span class="chip ${index === 2 ? "danger" : "neutral"}">${item.store}</span>
       <h3>${item.site}站</h3>
       <div class="numbers">
+        <div><span class="cell-sub">近30天销量</span><strong>${item.sales}</strong></div>
+        <div><span class="cell-sub">近30天销售额</span><strong>${item.salesAmount}</strong></div>
         <div><span class="cell-sub">评分</span><strong>${item.score}</strong></div>
         <div><span class="cell-sub">差评占比</span><strong>${item.negative}%</strong></div>
-        <div><span class="cell-sub">带图评论</span><strong>${item.imageReviews}</strong></div>
         <div><span class="cell-sub">评论总数</span><strong>${item.volume}</strong></div>
+        <div><span class="cell-sub">带图评论</span><strong>${item.imageReviews}</strong></div>
       </div>
     </article>
   `).join("");
@@ -440,8 +442,11 @@ function renderComparison() {
     <tr>
       <td>${item.store}</td>
       <td>${item.site}</td>
+      <td>${item.sales}</td>
+      <td>${item.salesAmount}</td>
       <td>${item.score}</td>
       <td>${item.negative}%</td>
+      <td>${item.volume}</td>
       <td>${item.imageReviews}</td>
       <td>${item.top3}</td>
       <td>${item.action}</td>
