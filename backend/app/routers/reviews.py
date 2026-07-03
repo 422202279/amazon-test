@@ -1,17 +1,50 @@
-from fastapi import APIRouter, Depends
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.review import Review
 from app.models.supplier_task import SupplierTask
+from app.models.user_account import UserAccount
 from app.serializers import to_dict
+from app.security import get_current_user
 from app.services.data_quality import validate_review_rows
 from app.services.import_jobs import create_import_job
 from app.services.query_helpers import split_identifier_terms
 from app.services.review_importer import import_reviews_from_workbook, preview_reviews_from_workbook
 
 router = APIRouter(prefix="/reviews", tags=["reviews"])
+
+
+class ReviewPayload(BaseModel):
+    platform: str
+    site_code: str
+    store_name: str | None = None
+    asin: str | None = None
+    product_title: str | None = None
+    review_external_id: str | None = None
+    review_url: str | None = None
+    product_url: str | None = None
+    star_rating: int | None = None
+    review_title: str | None = None
+    review_content: str | None = None
+    review_images: str | None = None
+    reviewer_name: str | None = None
+    review_country: str | None = None
+    review_language: str | None = None
+    is_verified_purchase: bool | None = None
+    helpful_count: int | None = None
+    has_images: bool = False
+    is_negative_review: bool = False
+    issue_category: str | None = None
+    sentiment: str | None = None
+    feedback_to_supplier: bool = False
+    rectification_status: str | None = None
+    source_type: str | None = None
+    reviewed_at: str | None = None
 
 
 @router.get("")
@@ -106,6 +139,54 @@ def list_reviews(
     return {"items": items, "total": total, "offset": offset, "limit": limit, "view_mode": view_mode}
 
 
+@router.post("")
+def create_review(
+    payload: ReviewPayload,
+    db: Session = Depends(get_db),
+    _: UserAccount = Depends(get_current_user),
+):
+    data = payload.model_dump()
+    data["reviewed_at"] = _parse_datetime(data.get("reviewed_at"))
+    review = Review(**data)
+    db.add(review)
+    db.commit()
+    db.refresh(review)
+    return to_dict(review)
+
+
+@router.put("/{review_id}")
+def update_review(
+    review_id: int,
+    payload: ReviewPayload,
+    db: Session = Depends(get_db),
+    _: UserAccount = Depends(get_current_user),
+):
+    review = db.query(Review).filter(Review.id == review_id).one_or_none()
+    if not review:
+        raise HTTPException(status_code=404, detail="评论不存在")
+    data = payload.model_dump()
+    data["reviewed_at"] = _parse_datetime(data.get("reviewed_at"))
+    for key, value in data.items():
+        setattr(review, key, value)
+    db.commit()
+    db.refresh(review)
+    return to_dict(review)
+
+
+@router.delete("/{review_id}")
+def delete_review(
+    review_id: int,
+    db: Session = Depends(get_db),
+    _: UserAccount = Depends(get_current_user),
+):
+    review = db.query(Review).filter(Review.id == review_id).one_or_none()
+    if not review:
+        raise HTTPException(status_code=404, detail="评论不存在")
+    db.delete(review)
+    db.commit()
+    return {"ok": True}
+
+
 @router.get("/import-preview")
 def preview_reviews(
     path: str,
@@ -149,3 +230,9 @@ def _serialize_review(review: Review, task: SupplierTask | None) -> dict:
     data["supplier_task_actual_rectification"] = task.actual_rectification if task else None
     data["supplier_task_notes"] = task.notes if task else None
     return data
+
+
+def _parse_datetime(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    return datetime.fromisoformat(value.replace(" ", "T"))

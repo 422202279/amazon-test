@@ -1,61 +1,104 @@
-from fastapi import APIRouter
+import json
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+from app.database import get_db
+from app.models.user_account import UserAccount
+from app.security import get_current_user, hash_password
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
+class UserPayload(BaseModel):
+    name: str
+    email: str
+    role: str = "只读访客"
+    scope: str | None = None
+    stores: list[str] = []
+    status: str = "启用"
+    password: str | None = None
+
+
 @router.get("/users")
-def list_users():
-    users = [
-        {
-            "id": 1,
-            "name": "系统管理员",
-            "email": "admin@cb-monitor.local",
-            "role": "管理员",
-            "scope": "全部店铺 / 全部模块",
-            "status": "启用",
-            "last_login": "2026-07-03 09:12",
-            "stores": ["US Home Store", "UK Living", "JP Kitchen", "CA Comfort"],
-        },
-        {
-            "id": 2,
-            "name": "产品开发A",
-            "email": "pd-a@cb-monitor.local",
-            "role": "产品开发",
-            "scope": "产品总表 / 评论总表 / 产品开发 / 供应商整改",
-            "status": "启用",
-            "last_login": "2026-07-03 08:46",
-            "stores": ["US Home Store", "CA Comfort"],
-        },
-        {
-            "id": 3,
-            "name": "运营同事B",
-            "email": "ops-b@cb-monitor.local",
-            "role": "运营",
-            "scope": "店铺 / 产品 / 评论 / 报告导出",
-            "status": "启用",
-            "last_login": "2026-07-02 19:35",
-            "stores": ["UK Living", "DE Ordnung", "FR Maison"],
-        },
-        {
-            "id": 4,
-            "name": "韩国数据专员",
-            "email": "kr-data@cb-monitor.local",
-            "role": "数据录入",
-            "scope": "韩国站产品 / 评论导入",
-            "status": "停用",
-            "last_login": "2026-06-29 14:18",
-            "stores": ["Coupang Seoul", "Naver Living"],
-        },
-    ]
+def list_users(
+    db: Session = Depends(get_db),
+    _: UserAccount = Depends(get_current_user),
+):
+    users = db.query(UserAccount).order_by(UserAccount.created_at.asc(), UserAccount.id.asc()).all()
     return {
-        "items": users,
+        "items": [_serialize_user(user) for user in users],
         "total": len(users),
         "notes": "V1 建议采用轻量后台：账号、角色、登录日志即可，不必先上复杂审批流。",
     }
 
 
+@router.post("/users")
+def create_user(
+    payload: UserPayload,
+    db: Session = Depends(get_db),
+    _: UserAccount = Depends(get_current_user),
+):
+    existing = db.query(UserAccount).filter(UserAccount.email == payload.email).one_or_none()
+    if existing:
+        raise HTTPException(status_code=400, detail="该邮箱已存在")
+    user = UserAccount(
+        name=payload.name,
+        email=payload.email,
+        password_hash=hash_password(payload.password or "12345678"),
+        role=payload.role,
+        scope=payload.scope,
+        stores_json=json.dumps(payload.stores, ensure_ascii=False),
+        status=payload.status,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return _serialize_user(user)
+
+
+@router.put("/users/{user_id}")
+def update_user(
+    user_id: int,
+    payload: UserPayload,
+    db: Session = Depends(get_db),
+    _: UserAccount = Depends(get_current_user),
+):
+    user = db.query(UserAccount).filter(UserAccount.id == user_id).one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="账号不存在")
+    user.name = payload.name
+    user.email = payload.email
+    user.role = payload.role
+    user.scope = payload.scope
+    user.stores_json = json.dumps(payload.stores, ensure_ascii=False)
+    user.status = payload.status
+    if payload.password:
+        user.password_hash = hash_password(payload.password)
+    db.commit()
+    db.refresh(user)
+    return _serialize_user(user)
+
+
+@router.delete("/users/{user_id}")
+def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _: UserAccount = Depends(get_current_user),
+):
+    user = db.query(UserAccount).filter(UserAccount.id == user_id).one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="账号不存在")
+    if user.email == "admin@cb-monitor.local":
+        raise HTTPException(status_code=400, detail="默认管理员不可删除")
+    db.delete(user)
+    db.commit()
+    return {"ok": True}
+
+
 @router.get("/roles")
-def list_roles():
+def list_roles(_: UserAccount = Depends(get_current_user)):
     return {
         "items": [
             {
@@ -88,7 +131,7 @@ def list_roles():
 
 
 @router.get("/security")
-def get_security_settings():
+def get_security_settings(_: UserAccount = Depends(get_current_user)):
     return {
         "login_mode": "账号密码登录",
         "deploy_mode": "轻量后台即可",
@@ -96,4 +139,23 @@ def get_security_settings():
         "password_policy": "8位以上，建议含数字与字母",
         "mfa": "V1 可不启用，云端公网访问时建议后续补上邮箱验证码或二次验证",
         "session_policy": "7天内保持登录，可手动退出全部设备",
+    }
+
+
+def _serialize_user(user: UserAccount) -> dict:
+    stores = []
+    if user.stores_json:
+        try:
+            stores = json.loads(user.stores_json)
+        except json.JSONDecodeError:
+            stores = []
+    return {
+        "id": user.id,
+        "name": user.name,
+        "email": user.email,
+        "role": user.role,
+        "scope": user.scope,
+        "status": user.status,
+        "last_login": user.last_login_at.isoformat(sep=" ", timespec="minutes") if user.last_login_at else "-",
+        "stores": stores,
     }

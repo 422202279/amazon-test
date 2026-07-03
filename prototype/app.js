@@ -11,6 +11,8 @@ const stores = [
 ];
 
 const API_BASE = "http://127.0.0.1:8000/api";
+const AUTH_TOKEN_KEY = "cb-auth-token";
+const AUTH_USER_KEY = "cb-auth-user";
 const siteLabelMap = {
   US: "美国",
   UK: "英国",
@@ -24,6 +26,7 @@ const siteLabelMap = {
 const productSortState = { key: "", direction: "desc" };
 const reviewSortState = { key: "", direction: "desc" };
 const comparisonSortState = { key: "", direction: "desc" };
+let currentUser = null;
 
 let products = [
   { tone: "tone-1", name: "记忆棉人体工学坐垫", asin: "B0DXSEAT01", parentAsin: "B0DXSEAT00", sku: "CUS-01-US", store: "US Home Store", site: "美国", platform: "Amazon", category: "Home & Kitchen", price: "$29.99", sales: 642, salesAmount: "$19,253", reviews: 1284, newReviews: 36, rating: 4.1, imageReviews: 93, variantCount: 4, keywords: "seat cushion / office cushion", bsr: "#1,248 / #13", dimensions: "45 x 35 x 7 cm / 1.1 kg", fulfillment: "FBA", sellerCount: 2, buybox: "异常", buyboxSeller: "BestHouse US", adFlags: "SP / 视频", contentFlags: "A+ / 品牌店铺", negative: "12 条", issue: "坐感塌陷 / 尺寸偏小", supplier: "宁波舒垫工厂", launchDate: "2026-03-12", rectify: "处理中" },
@@ -125,6 +128,48 @@ function starString(count) {
 
 function thumbs(count = 3) {
   return Array.from({ length: count }, (_, index) => `<span class="thumb tone-${(index % 6) + 1}"></span>`).join("");
+}
+
+function getAuthToken() {
+  return localStorage.getItem(AUTH_TOKEN_KEY) || "";
+}
+
+function setAuthSession(token, user) {
+  localStorage.setItem(AUTH_TOKEN_KEY, token);
+  localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+  currentUser = user;
+}
+
+function clearAuthSession() {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+  localStorage.removeItem(AUTH_USER_KEY);
+  currentUser = null;
+}
+
+function loadStoredUser() {
+  const raw = localStorage.getItem(AUTH_USER_KEY);
+  if (!raw) return null;
+  try {
+    currentUser = JSON.parse(raw);
+    return currentUser;
+  } catch (error) {
+    clearAuthSession();
+    return null;
+  }
+}
+
+function redirectToLogin() {
+  if (document.body.dataset.page !== "login") {
+    window.location.href = "./login.html";
+  }
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
 }
 
 function localizeSite(site) {
@@ -308,12 +353,13 @@ function renderProducts() {
   if (!body || !head) return;
 
   const visibleColumns = productColumns.filter((column) => column.visible);
-  head.innerHTML = visibleColumns.map((column) => `<th data-col="${column.key}">${column.label}${sortIndicator(productSortState, column.key)}</th>`).join("");
+  head.innerHTML = `${visibleColumns.map((column) => `<th data-col="${column.key}">${column.label}${sortIndicator(productSortState, column.key)}</th>`).join("")}<th>操作</th>`;
 
   const sortedProducts = applySort(products, productSortState, getProductSortValue);
   body.innerHTML = sortedProducts.map((item) => `
     <tr>
       ${visibleColumns.map((column) => `<td data-col="${column.key}">${renderProductCell(item, column.key)}</td>`).join("")}
+      <td>${renderRowActions("product", item.recordId)}</td>
     </tr>
   `).join("");
 
@@ -333,6 +379,7 @@ function renderProducts() {
   });
 
   updateProductSummary(sortedProducts);
+  bindProductRowActions();
 }
 
 function renderProductColumnPicker() {
@@ -554,6 +601,7 @@ function renderReviews() {
         <td><span class="status neutral">产品聚合</span></td>
         <td><span class="status ${(group.supplier_task_statuses || []).length ? "warn" : "neutral"}">${(group.supplier_task_statuses || []).join(" / ") || "未生成任务"}</span></td>
         <td><span class="status neutral">查看子评论</span></td>
+        <td><span class="cell-sub">聚合视图不支持直接编辑</span></td>
       </tr>
     `).join("");
     bindReviewSort();
@@ -588,10 +636,12 @@ function renderReviews() {
       <td><span class="status ${review.mood === "正面" ? "success" : review.mood === "中性" ? "warn" : "danger"}">${review.mood}</span></td>
       <td><span class="status ${statusClass(review.feedback)}">${review.feedback}</span>${review.supplierTaskCode ? `<span class="cell-sub">任务 ${review.supplierTaskCode}</span>` : ""}</td>
       <td><span class="status ${statusClass(review.rectify)}">${review.rectify}</span>${review.supplierTaskStatus ? `<span class="cell-sub">${review.supplierTaskStatus}${review.supplierTaskNotes ? ` · ${review.supplierTaskNotes}` : ""}</span>` : ""}</td>
+      <td>${renderRowActions("review", review.recordId)}</td>
     </tr>
   `).join("");
   bindReviewSort();
   updateReviewSummary(sortedReviews, false);
+  bindReviewRowActions();
 }
 
 function getReviewSortValue(item, key) {
@@ -807,8 +857,10 @@ function renderTasks() {
       <td><span class="status ${statusClass(task.priority)}">${task.priority}</span></td>
       <td><span class="status ${statusClass(task.status)}">${task.status}</span></td>
       <td>${task.due}</td>
+      <td>${renderRowActions("task", task.recordId)}</td>
     </tr>
   `).join("");
+  bindTaskRowActions();
 }
 
 function renderReports() {
@@ -858,7 +910,7 @@ function renderAccountManagement() {
       <td>${(account.stores || []).join(" / ")}</td>
       <td><span class="status ${account.status === "启用" ? "success" : "danger"}">${account.status}</span></td>
       <td>${account.lastLogin}</td>
-      <td>重置密码 / 调整角色 / ${account.status === "启用" ? "可停用" : "可启用"}</td>
+      <td>${renderRowActions("account", account.recordId)}</td>
     </tr>
   `).join("");
 
@@ -878,6 +930,7 @@ function renderAccountManagement() {
   if (active) active.textContent = `启用中 ${accounts.filter((item) => item.status === "启用").length}`;
   if (pd) pd.textContent = `产品开发 ${accounts.filter((item) => item.role === "产品开发").length}`;
   if (disabled) disabled.textContent = `停用 ${accounts.filter((item) => item.status !== "启用").length}`;
+  bindAccountRowActions();
 }
 
 function renderSourceCapabilities(items) {
@@ -949,7 +1002,43 @@ function renderLiveValidation(payload) {
   `).join("");
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+function renderRowActions(type, recordId) {
+  if (!recordId) return '<span class="cell-sub">本地演示数据</span>';
+  return `
+    <button class="button ghost mini-action" data-row-action="edit" data-row-type="${type}" data-row-id="${recordId}">编辑</button>
+    <button class="button ghost mini-action" data-row-action="delete" data-row-type="${type}" data-row-id="${recordId}">删除</button>
+  `;
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+  const page = document.body.dataset.page;
+  if (page === "login") {
+    bindLoginForm();
+    if (getAuthToken()) {
+      try {
+        await fetchJson("/auth/me");
+        window.location.href = "./index.html";
+      } catch (error) {
+        clearAuthSession();
+      }
+    }
+    return;
+  }
+
+  loadStoredUser();
+  if (!getAuthToken()) {
+    redirectToLogin();
+    return;
+  }
+
+  try {
+    currentUser = await fetchJson("/auth/me");
+  } catch (error) {
+    clearAuthSession();
+    redirectToLogin();
+    return;
+  }
+
   restoreProductColumns();
   renderDashboard();
   renderStores();
@@ -961,16 +1050,48 @@ document.addEventListener("DOMContentLoaded", () => {
   renderTasks();
   renderReports();
   renderAccountManagement();
-  hydrateLiveData();
-  hydrateScheduleSettings();
-  hydrateOpsInsights();
-  hydrateAdminData();
+  await hydrateLiveData();
+  await hydrateScheduleSettings();
+  await hydrateOpsInsights();
+  await hydrateAdminData();
   bindProductFilters();
   bindReviewFilters();
   bindReviewViewSwitch();
   bindComparisonSubmit();
   bindManualRefresh();
+  bindCrudActions();
 });
+
+function bindLoginForm() {
+  const button = document.getElementById("login-submit");
+  if (!button) return;
+  button.addEventListener("click", async () => {
+    const email = document.getElementById("login-email")?.value?.trim() || "";
+    const password = document.getElementById("login-password")?.value || "";
+    const status = document.getElementById("login-status");
+    if (status) status.textContent = "正在登录...";
+    try {
+      const data = await fetchJson("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      });
+      setAuthSession(data.token, data.user);
+      window.location.href = "./index.html";
+    } catch (error) {
+      if (status) status.textContent = error.message || "登录失败，请检查账号密码";
+    }
+  });
+}
+
+function bindCrudActions() {
+  bindProductCreate();
+  bindReviewCreate();
+  bindTaskCreate();
+  bindAccountCreate();
+  bindBootstrapLocalData();
+  bindGenerateTasks();
+  bindLogout();
+}
 
 function bindReviewViewSwitch() {
   const buttons = document.querySelectorAll("[data-review-view]");
@@ -1044,8 +1165,30 @@ async function hydrateLiveData() {
 }
 
 async function fetchJson(path, options = undefined) {
-  const response = await fetch(`${API_BASE}${path}`, options);
-  if (!response.ok) throw new Error(`Failed to fetch ${path}`);
+  const headers = new Headers(options?.headers || {});
+  if (!headers.has("Content-Type") && options?.body) {
+    headers.set("Content-Type", "application/json");
+  }
+  const token = getAuthToken();
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+  const response = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  if (response.status === 401) {
+    clearAuthSession();
+    redirectToLogin();
+    throw new Error("登录已失效，请重新登录");
+  }
+  if (!response.ok) {
+    let message = `Failed to fetch ${path}`;
+    try {
+      const errorBody = await response.json();
+      message = errorBody.detail || message;
+    } catch (error) {
+      // ignore non-json error body
+    }
+    throw new Error(message);
+  }
   return response.json();
 }
 
@@ -1194,6 +1337,7 @@ async function hydrateAdminData() {
     ]);
     if (userData.items?.length) {
       accounts = userData.items.map((item) => ({
+        recordId: item.id,
         name: item.name,
         email: item.email,
         role: item.role,
@@ -1228,6 +1372,346 @@ async function hydrateAdminData() {
   } catch (error) {
     console.warn("Admin API unavailable, fallback to local mock data", error);
   }
+}
+
+function bindBootstrapLocalData() {
+  const button = document.getElementById("products-bootstrap-button");
+  if (!button) return;
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+    button.textContent = "导入中...";
+    try {
+      await fetchJson("/ops/bootstrap-local-data", { method: "POST" });
+      await hydrateProducts();
+      alert("本地真实产品/店铺/销量数据已导入，可以开始筛选和编辑。");
+    } catch (error) {
+      alert(`导入失败：${error.message}`);
+    } finally {
+      button.disabled = false;
+      button.textContent = "导入本地真实数据";
+    }
+  });
+}
+
+function bindGenerateTasks() {
+  const button = document.getElementById("reviews-generate-tasks-button") || document.getElementById("tasks-generate-button");
+  if (!button) return;
+  button.addEventListener("click", async () => {
+    try {
+      await fetchJson("/supplier-tasks/generate-from-reviews?limit=100", { method: "POST" });
+      await hydrateTasks();
+      alert("已根据差评生成或补充整改任务。");
+    } catch (error) {
+      alert(`生成失败：${error.message}`);
+    }
+  });
+}
+
+function bindLogout() {
+  const button = document.getElementById("logout-button");
+  if (!button) return;
+  button.addEventListener("click", async () => {
+    try {
+      await fetchJson("/auth/logout", { method: "POST" });
+    } catch (error) {
+      // ignore network error on logout
+    }
+    clearAuthSession();
+    redirectToLogin();
+  });
+}
+
+function bindProductCreate() {
+  const button = document.getElementById("products-create-button");
+  if (!button) return;
+  button.addEventListener("click", async () => {
+    const payload = promptProductPayload();
+    if (!payload) return;
+    try {
+      await fetchJson("/products", { method: "POST", body: JSON.stringify(payload) });
+      await hydrateProducts();
+    } catch (error) {
+      alert(`新增产品失败：${error.message}`);
+    }
+  });
+}
+
+function bindReviewCreate() {
+  const button = document.getElementById("reviews-create-button");
+  if (!button) return;
+  button.addEventListener("click", async () => {
+    const payload = promptReviewPayload();
+    if (!payload) return;
+    try {
+      await fetchJson("/reviews", { method: "POST", body: JSON.stringify(payload) });
+      await hydrateReviews();
+    } catch (error) {
+      alert(`新增评论失败：${error.message}`);
+    }
+  });
+}
+
+function bindTaskCreate() {
+  const button = document.getElementById("tasks-create-button");
+  if (!button) return;
+  button.addEventListener("click", async () => {
+    const payload = promptTaskPayload();
+    if (!payload) return;
+    try {
+      await fetchJson("/supplier-tasks", { method: "POST", body: JSON.stringify(payload) });
+      await hydrateTasks();
+    } catch (error) {
+      alert(`新增任务失败：${error.message}`);
+    }
+  });
+}
+
+function bindAccountCreate() {
+  const button = document.getElementById("accounts-create-button");
+  if (!button) return;
+  button.addEventListener("click", async () => {
+    const payload = promptAccountPayload();
+    if (!payload) return;
+    try {
+      await fetchJson("/admin/users", { method: "POST", body: JSON.stringify(payload) });
+      await hydrateAdminData();
+    } catch (error) {
+      alert(`新增账号失败：${error.message}`);
+    }
+  });
+}
+
+function bindProductRowActions() {
+  document.querySelectorAll('[data-row-type="product"]').forEach((button) => {
+    button.onclick = async () => {
+      const id = Number(button.getAttribute("data-row-id"));
+      const action = button.getAttribute("data-row-action");
+      const target = products.find((item) => item.recordId === id);
+      if (!target) return;
+      if (action === "edit") {
+        const payload = promptProductPayload(target);
+        if (!payload) return;
+        await fetchJson(`/products/${id}`, { method: "PUT", body: JSON.stringify(payload) });
+        await hydrateProducts();
+        return;
+      }
+      if (confirm(`确认删除产品：${target.name}？`)) {
+        await fetchJson(`/products/${id}`, { method: "DELETE" });
+        await hydrateProducts();
+      }
+    };
+  });
+}
+
+function bindReviewRowActions() {
+  document.querySelectorAll('[data-row-type="review"]').forEach((button) => {
+    button.onclick = async () => {
+      const id = Number(button.getAttribute("data-row-id"));
+      const action = button.getAttribute("data-row-action");
+      const target = reviews.find((item) => item.recordId === id);
+      if (!target) return;
+      if (action === "edit") {
+        const payload = promptReviewPayload(target);
+        if (!payload) return;
+        await fetchJson(`/reviews/${id}`, { method: "PUT", body: JSON.stringify(payload) });
+        await hydrateReviews();
+        return;
+      }
+      if (confirm(`确认删除评论：${target.title || target.id}？`)) {
+        await fetchJson(`/reviews/${id}`, { method: "DELETE" });
+        await hydrateReviews();
+      }
+    };
+  });
+}
+
+function bindTaskRowActions() {
+  document.querySelectorAll('[data-row-type="task"]').forEach((button) => {
+    button.onclick = async () => {
+      const id = Number(button.getAttribute("data-row-id"));
+      const action = button.getAttribute("data-row-action");
+      const target = tasks.find((item) => item.recordId === id);
+      if (!target) return;
+      if (action === "edit") {
+        const payload = promptTaskPayload(target);
+        if (!payload) return;
+        await fetchJson(`/supplier-tasks/${id}`, { method: "PUT", body: JSON.stringify(payload) });
+        await hydrateTasks();
+        return;
+      }
+      if (confirm(`确认删除整改任务：${target.id}？`)) {
+        await fetchJson(`/supplier-tasks/${id}`, { method: "DELETE" });
+        await hydrateTasks();
+      }
+    };
+  });
+}
+
+function bindAccountRowActions() {
+  document.querySelectorAll('[data-row-type="account"]').forEach((button) => {
+    button.onclick = async () => {
+      const id = Number(button.getAttribute("data-row-id"));
+      const action = button.getAttribute("data-row-action");
+      const target = accounts.find((item) => item.recordId === id);
+      if (!target) return;
+      if (action === "edit") {
+        const payload = promptAccountPayload(target);
+        if (!payload) return;
+        await fetchJson(`/admin/users/${id}`, { method: "PUT", body: JSON.stringify(payload) });
+        await hydrateAdminData();
+        return;
+      }
+      if (confirm(`确认删除账号：${target.email}？`)) {
+        await fetchJson(`/admin/users/${id}`, { method: "DELETE" });
+        await hydrateAdminData();
+      }
+    };
+  });
+}
+
+function promptProductPayload(source = null) {
+  const title = prompt("产品标题", source?.name || "");
+  if (!title) return null;
+  const platform = prompt("平台", source?.platform || "Amazon") || "Amazon";
+  const siteCode = prompt("站点代码（US/UK/DE/JP/CA/FR/KR）", reverseLocalizeSite(source?.site) || "US") || "US";
+  const storeName = prompt("店铺名", source?.store || "") || "";
+  const asin = prompt("ASIN", source?.asin || "") || "";
+  const sku = prompt("SKU", source?.sku || "") || "";
+  const priceAmount = prompt("价格数字", stripToNumeric(source?.price || "")) || "";
+  const rating = prompt("评分", source?.rating || "") || "";
+  return {
+    platform,
+    site_code: siteCode,
+    store_name: storeName,
+    asin,
+    sku,
+    title,
+    category_name: source?.category || "",
+    product_url: source?.productUrl || "",
+    price_amount: priceAmount ? Number(priceAmount) : null,
+    price_currency: detectCurrencySymbol(source?.price || "$"),
+    monthly_sales: Number(source?.sales || 0) || null,
+    monthly_revenue: stripToNumeric(source?.salesAmount || "") ? Number(stripToNumeric(source.salesAmount)) : null,
+    review_count: Number(source?.reviews || 0) || null,
+    rating: rating ? Number(rating) : null,
+    variation_count: Number(source?.variantCount || 0) || null,
+    seller_count: Number(source?.sellerCount || 0) || null,
+    buybox_seller: source?.buyboxSeller || "",
+    fulfillment_type: source?.fulfillment || "",
+    keyword_total: null,
+    keyword_organic: null,
+    keyword_ads: null,
+    bsr_main: null,
+    bsr_sub: null,
+    weight_text: source?.dimensions || "",
+    size_text: source?.dimensions || "",
+    package_weight_text: "",
+    package_size_text: "",
+    supplier_name: source?.supplier || "",
+    supplier_factory: source?.supplier || "",
+    status: source?.rectify || "正常监控",
+    parent_asin: source?.parentAsin || "",
+    brand: "",
+    category_path: "",
+    image_url: "",
+    department_item_no: "",
+    qa_count: null,
+  };
+}
+
+function promptReviewPayload(source = null) {
+  const title = prompt("评论标题", source?.title || "");
+  if (title === null) return null;
+  return {
+    platform: prompt("平台", source?.platform || "Amazon") || "Amazon",
+    site_code: prompt("站点代码", reverseLocalizeSite(source?.site) || "US") || "US",
+    store_name: prompt("店铺名", source?.store || "") || "",
+    asin: prompt("ASIN", source?.asin || "") || "",
+    product_title: prompt("产品标题", source?.product || "") || "",
+    review_external_id: prompt("评论外部ID", source?.id || "") || "",
+    review_url: prompt("评论链接", source?.reviewUrl || "") || "",
+    product_url: prompt("产品链接", source?.productUrl || "") || "",
+    star_rating: Number(prompt("星级（1-5）", source?.stars || "3") || "3"),
+    review_title: title || "",
+    review_content: prompt("评论内容", source?.content || "") || "",
+    review_images: source?.hasImage ? "image" : "",
+    reviewer_name: "Local User",
+    review_country: reverseLocalizeSite(source?.site) || "US",
+    review_language: "zh",
+    is_verified_purchase: true,
+    helpful_count: 0,
+    has_images: Boolean(source?.hasImage),
+    is_negative_review: Number(source?.stars || 3) <= 3,
+    issue_category: prompt("问题分类", source?.issue || "待分类") || "待分类",
+    sentiment: prompt("情绪（正面/中性/负面）", source?.mood || "中性") || "中性",
+    feedback_to_supplier: (prompt("是否反馈供应商（yes/no）", source?.feedback === "已反馈" ? "yes" : "no") || "no") === "yes",
+    rectification_status: prompt("整改状态", source?.rectify || "待反馈") || "待反馈",
+    source_type: prompt("数据来源", source?.source || "手动录入") || "手动录入",
+    reviewed_at: source?.reviewedAt || new Date().toISOString(),
+  };
+}
+
+function promptTaskPayload(source = null) {
+  const taskCode = prompt("任务编号", source?.id || `SR-${Date.now()}`);
+  if (!taskCode) return null;
+  return {
+    task_code: taskCode,
+    asin: prompt("ASIN", source?.asin || "") || "",
+    product_title: prompt("产品标题", source?.product || "") || "",
+    supplier_name: prompt("供应商", source?.supplier || "") || "",
+    issue_category: prompt("问题分类", source?.issue || "") || "",
+    evidence_summary: prompt("证据摘要", source?.evidence || "") || "",
+    status: mapTaskStatusToApi(prompt("状态（待反馈/处理中/观察中/已整改）", source?.status || "待反馈") || "待反馈"),
+    priority: mapTaskPriorityToApi(prompt("优先级（高/中/低）", source?.priority || "中") || "中"),
+    due_date: prompt("截止日期（YYYY-MM-DD）", source?.due && source.due !== "-" ? source.due : "") || null,
+    suggested_action: prompt("建议方案", source?.suggestedAction || "") || "",
+    actual_rectification: prompt("实际整改", source?.actualRectification || "") || "",
+    notes: "",
+  };
+}
+
+function promptAccountPayload(source = null) {
+  const email = prompt("邮箱", source?.email || "");
+  if (!email) return null;
+  return {
+    name: prompt("姓名", source?.name || "") || "",
+    email,
+    role: prompt("角色", source?.role || "只读访客") || "只读访客",
+    scope: prompt("可访问范围", source?.scope || "") || "",
+    stores: splitTerms(prompt("绑定店铺（逗号/空格分隔）", (source?.stores || []).join(", ")) || ""),
+    status: prompt("状态（启用/停用）", source?.status || "启用") || "启用",
+    password: prompt("密码（留空则用默认密码）", "") || undefined,
+  };
+}
+
+function reverseLocalizeSite(site) {
+  const entry = Object.entries(siteLabelMap).find(([, label]) => label === site);
+  return entry?.[0] || site || "";
+}
+
+function stripToNumeric(text) {
+  return String(text || "").replace(/,/g, "").replace(/[^\d.-]/g, "");
+}
+
+function detectCurrencySymbol(text) {
+  if (String(text).includes("£")) return "£";
+  if (String(text).includes("€")) return "€";
+  if (String(text).includes("¥")) return "¥";
+  if (String(text).toUpperCase().includes("CA$")) return "CA$";
+  return "$";
+}
+
+function mapTaskStatusToApi(label) {
+  if (label === "处理中") return "in_progress";
+  if (label === "观察中") return "observing";
+  if (label === "已整改") return "resolved";
+  return "pending_feedback";
+}
+
+function mapTaskPriorityToApi(label) {
+  if (label === "高") return "high";
+  if (label === "低") return "low";
+  return "medium";
 }
 
 function filterReviewsLocally(items, isGrouped) {
@@ -1272,6 +1756,7 @@ function matchesPeriod(timestamp, period) {
 
 function mapProductFromApi(item) {
   return {
+    recordId: item.id,
     tone: "tone-1",
     name: item.title || "未命名产品",
     asin: item.asin || "-",
@@ -1281,6 +1766,7 @@ function mapProductFromApi(item) {
     site: localizeSite(item.site_code),
     platform: item.platform || "-",
     category: item.category_name || item.category_path || "-",
+    productUrl: item.product_url || "",
     price: item.price_amount ? `${item.price_currency || ""}${item.price_amount}` : "-",
     sales: item.monthly_sales ?? "-",
     salesAmount: item.monthly_revenue ? `${item.price_currency || ""}${item.monthly_revenue}` : "-",
@@ -1308,6 +1794,7 @@ function mapProductFromApi(item) {
 
 function mapReviewFromApi(item) {
   return {
+    recordId: item.id,
     tone: "tone-1",
     id: item.review_external_id || `RV-${item.id || "N/A"}`,
     title: item.review_title || "无标题评论",
@@ -1351,7 +1838,9 @@ function mapComparisonFromApi(item) {
 
 function mapTaskFromApi(item) {
   return {
+    recordId: item.id,
     id: item.task_code || `SR-${item.id}`,
+    asin: item.asin || "",
     product: item.product_title || "未命名产品",
     supplier: item.supplier_name || "待补供应商",
     issue: item.issue_category || "其他",

@@ -6,11 +6,18 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db
 from app.models.import_job import ImportJob
+from app.models.user_account import UserAccount
 from app.serializers import to_dict
+from app.security import get_current_user
 from app.services.data_quality import build_data_quality_summary
 from app.services.product_importer import (
+    import_internal_store_links,
+    import_internal_store_products,
+    import_sellersprite_sales_history,
+    import_sellersprite_products,
     preview_internal_store_links,
     preview_internal_store_products,
+    preview_sellersprite_sales_history,
     preview_sellersprite_products,
 )
 
@@ -164,3 +171,25 @@ def live_validation():
         payload["store_links_error"] = str(exc)
 
     return payload
+
+
+@router.post("/bootstrap-local-data")
+def bootstrap_local_data(
+    db: Session = Depends(get_db),
+    _: UserAccount = Depends(get_current_user),
+):
+    internal_path = "/Users/jcc_mac/Documents/A新禾亚马逊一部/产品信息汇总表 新系统一些SKU加点版本_在售版本汇总.xlsx"
+    product_path = "/Users/jcc_mac/Downloads/Product-CA-20260702.xlsx"
+    sales_path = "/Users/jcc_mac/Downloads/product-CA-sales-20260702-71124.xlsx"
+    result = {
+        "stores": {"created": 0, "updated": 0},
+        "internal_products": {"created": 0, "updated": 0},
+        "sellersprite_products": {"created": 0, "updated": 0},
+        "sales_history": {"created": 0, "updated": 0},
+    }
+    result["stores"] = import_internal_store_links(db, internal_path)
+    result["internal_products"] = import_internal_store_products(db, internal_path, 200)
+    result["sellersprite_products"] = import_sellersprite_products(db, product_path, 200)
+    result["sales_history"] = import_sellersprite_sales_history(db, sales_path, 200)
+    db.commit()
+    return result

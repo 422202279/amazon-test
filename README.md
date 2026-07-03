@@ -82,6 +82,22 @@ pip install -r requirements.txt
 python main.py
 ```
 
+前端本地预览：
+
+- 直接打开 `prototype/login.html`
+- 默认本地管理员：
+  - 账号：`admin@cb-monitor.local`
+  - 密码：`admin123456`
+
+## 当前已打通的本地闭环
+
+- 登录 / 退出
+- 本地真实产品数据一键导入
+- 账号管理增删改查
+- 产品增删改查
+- 评论增删改查
+- 供应商整改任务增删改查
+
 ## 云部署准备
 
 仓库已补充最低配部署骨架：

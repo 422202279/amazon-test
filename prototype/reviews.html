@@ -39,7 +39,8 @@
           <div class="topbar-actions">
             <button class="button ghost">批量标记问题分类</button>
             <button class="button ghost">导出筛选结果</button>
-            <button class="button primary">生成整改任务</button>
+            <button class="button ghost" id="reviews-generate-tasks-button">生成整改任务</button>
+            <button class="button primary" id="reviews-create-button">新增评论</button>
           </div>
         </header>
 
@@ -120,6 +121,7 @@
                   <th data-sort="mood">情绪</th>
                   <th data-sort="feedback">是否反馈供应商</th>
                   <th data-sort="rectify">整改状态</th>
+                  <th>操作</th>
                 </tr>
               </thead>
               <tbody id="reviews-table"></tbody>

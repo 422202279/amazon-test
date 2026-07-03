@@ -5,5 +5,6 @@ from app.models.report import Report
 from app.models.review import Review
 from app.models.store import Store
 from app.models.supplier_task import SupplierTask
+from app.models.user_account import UserAccount
 
-__all__ = ["ImportJob", "Product", "ProductMetricHistory", "Report", "Review", "Store", "SupplierTask"]
+__all__ = ["ImportJob", "Product", "ProductMetricHistory", "Report", "Review", "Store", "SupplierTask", "UserAccount"]

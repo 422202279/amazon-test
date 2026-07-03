@@ -1,13 +1,14 @@
-from fastapi import APIRouter
-
-from fastapi import Depends
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import case, func, or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.product import Product
 from app.models.review import Review
+from app.models.user_account import UserAccount
 from app.serializers import to_dict
+from app.security import get_current_user
 from app.services.data_quality import validate_product_rows
 from app.services.import_jobs import create_import_job
 from app.services.product_importer import (
@@ -19,6 +20,45 @@ from app.services.product_importer import (
 from app.services.query_helpers import split_identifier_terms
 
 router = APIRouter(prefix="/products", tags=["products"])
+
+
+class ProductPayload(BaseModel):
+    platform: str
+    site_code: str
+    store_name: str | None = None
+    department_item_no: str | None = None
+    sku: str | None = None
+    asin: str | None = None
+    parent_asin: str | None = None
+    title: str
+    brand: str | None = None
+    category_path: str | None = None
+    category_name: str | None = None
+    product_url: str | None = None
+    image_url: str | None = None
+    price_amount: float | None = None
+    price_currency: str | None = None
+    monthly_sales: int | None = None
+    monthly_revenue: float | None = None
+    review_count: int | None = None
+    rating: float | None = None
+    qa_count: int | None = None
+    variation_count: int | None = None
+    seller_count: int | None = None
+    buybox_seller: str | None = None
+    fulfillment_type: str | None = None
+    keyword_total: int | None = None
+    keyword_organic: int | None = None
+    keyword_ads: int | None = None
+    bsr_main: int | None = None
+    bsr_sub: int | None = None
+    weight_text: str | None = None
+    size_text: str | None = None
+    package_weight_text: str | None = None
+    package_size_text: str | None = None
+    supplier_name: str | None = None
+    supplier_factory: str | None = None
+    status: str | None = None
 
 
 @router.get("")
@@ -64,6 +104,50 @@ def list_products(
     total = query.count()
     items = query.order_by(Product.updated_at.desc(), Product.id.desc()).offset(offset).limit(limit).all()
     return {"items": [to_dict(item) for item in items], "total": total, "offset": offset, "limit": limit}
+
+
+@router.post("")
+def create_product(
+    payload: ProductPayload,
+    db: Session = Depends(get_db),
+    _: UserAccount = Depends(get_current_user),
+):
+    product = Product(**payload.model_dump())
+    db.add(product)
+    db.commit()
+    db.refresh(product)
+    return to_dict(product)
+
+
+@router.put("/{product_id}")
+def update_product(
+    product_id: int,
+    payload: ProductPayload,
+    db: Session = Depends(get_db),
+    _: UserAccount = Depends(get_current_user),
+):
+    product = db.query(Product).filter(Product.id == product_id).one_or_none()
+    if not product:
+        raise HTTPException(status_code=404, detail="产品不存在")
+    for key, value in payload.model_dump().items():
+        setattr(product, key, value)
+    db.commit()
+    db.refresh(product)
+    return to_dict(product)
+
+
+@router.delete("/{product_id}")
+def delete_product(
+    product_id: int,
+    db: Session = Depends(get_db),
+    _: UserAccount = Depends(get_current_user),
+):
+    product = db.query(Product).filter(Product.id == product_id).one_or_none()
+    if not product:
+        raise HTTPException(status_code=404, detail="产品不存在")
+    db.delete(product)
+    db.commit()
+    return {"ok": True}
 
 
 @router.get("/compare")

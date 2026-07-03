@@ -38,7 +38,8 @@
           </div>
           <div class="topbar-actions">
             <button class="button ghost">导出整改表</button>
-            <button class="button primary">新建整改任务</button>
+            <button class="button ghost" id="tasks-generate-button">从差评生成任务</button>
+            <button class="button primary" id="tasks-create-button">新建整改任务</button>
           </div>
         </header>
 
@@ -73,6 +74,7 @@
                   <th>优先级</th>
                   <th>状态</th>
                   <th>截止时间</th>
+                  <th>操作</th>
                 </tr>
               </thead>
               <tbody id="tasks-table"></tbody>

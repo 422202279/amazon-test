@@ -29,6 +29,12 @@ def ensure_lightweight_migrations() -> None:
         "supplier_tasks": {
             "suggested_action": "TEXT",
             "actual_rectification": "TEXT",
+        },
+        "user_accounts": {
+            "scope": "VARCHAR(500)",
+            "stores_json": "TEXT",
+            "status": "VARCHAR(40) DEFAULT '启用'",
+            "last_login_at": "DATETIME",
         }
     }
     with engine.begin() as connection:

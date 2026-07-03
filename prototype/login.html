@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>登录 | CrossBorder Store Review Monitor Lite</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body data-page="login">
+    <main class="login-shell">
+      <section class="login-card">
+        <div class="brand brand-login">
+          <div class="brand-mark">CB</div>
+          <div>
+            <strong>Review Monitor Lite</strong>
+            <p>本地登录后可进行增删改查与真实数据导入</p>
+          </div>
+        </div>
+        <div class="form-grid single">
+          <label><span>邮箱</span><input id="login-email" type="text" value="admin@cb-monitor.local" /></label>
+          <label><span>密码</span><input id="login-password" type="password" value="admin123456" /></label>
+        </div>
+        <button class="button primary full" id="login-submit">登录进入系统</button>
+        <p class="cell-sub" id="login-status">默认本地管理员：admin@cb-monitor.local / admin123456</p>
+      </section>
+    </main>
+    <script src="./app.js"></script>
+  </body>
+</html>

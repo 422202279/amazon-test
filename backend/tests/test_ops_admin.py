@@ -3,13 +3,32 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.routers.admin import get_security_settings, list_roles, list_users
+from app.database import Base
+from app.models.user_account import UserAccount
+from app.routers.admin import (
+    UserPayload,
+    create_user,
+    get_security_settings,
+    list_roles,
+    list_users,
+    update_user,
+)
+from app.routers.auth import LoginPayload, login, me
 from app.routers.ops import deployment_profile, live_validation, source_capabilities
+from app.security import ensure_default_admin
 
 
 class OpsAdminTests(unittest.TestCase):
+    def setUp(self):
+        self.engine = create_engine("sqlite:///:memory:")
+        self.session_factory = sessionmaker(bind=self.engine, autoflush=False, autocommit=False)
+        Base.metadata.create_all(bind=self.engine)
+
     def test_source_capabilities_marks_amazon_cloud_ready(self):
         payload = source_capabilities()
 
@@ -26,14 +45,63 @@ class OpsAdminTests(unittest.TestCase):
         self.assertTrue(payload["ssl_required"])
 
     def test_admin_users_and_roles_have_expected_shape(self):
-        users = list_users()
-        roles = list_roles()
-        security = get_security_settings()
+        with self.session_factory() as db:
+          ensure_default_admin(db)
+          admin_user = db.query(UserAccount).filter(UserAccount.email == "admin@cb-monitor.local").one()
+          users = list_users(db=db, _=admin_user)
+          roles = list_roles(_=admin_user)
+          security = get_security_settings(_=admin_user)
 
-        self.assertGreaterEqual(users["total"], 4)
+        self.assertGreaterEqual(users["total"], 1)
         self.assertEqual(users["items"][0]["role"], "管理员")
         self.assertGreaterEqual(len(roles["items"]), 3)
         self.assertEqual(security["deploy_mode"], "轻量后台即可")
+
+    def test_login_and_me_work_for_default_admin(self):
+        with self.session_factory() as db:
+            ensure_default_admin(db)
+            payload = login(LoginPayload(email="admin@cb-monitor.local", password="admin123456"), db=db)
+            admin_user = db.query(UserAccount).filter(UserAccount.email == "admin@cb-monitor.local").one()
+            me_payload = me(user=admin_user)
+
+        self.assertIn("token", payload)
+        self.assertEqual(me_payload["email"], "admin@cb-monitor.local")
+
+    def test_create_and_update_user(self):
+        with self.session_factory() as db:
+            ensure_default_admin(db)
+            admin_user = db.query(UserAccount).filter(UserAccount.email == "admin@cb-monitor.local").one()
+            created = create_user(
+                UserPayload(
+                    name="测试账号",
+                    email="tester@example.com",
+                    role="运营",
+                    scope="产品 / 评论",
+                    stores=["US Home Store"],
+                    status="启用",
+                    password="12345678",
+                ),
+                db=db,
+                _=admin_user,
+            )
+            updated = update_user(
+                created["id"],
+                UserPayload(
+                    name="测试账号2",
+                    email="tester@example.com",
+                    role="产品开发",
+                    scope="产品 / 评论 / 整改",
+                    stores=["CA Comfort"],
+                    status="启用",
+                    password="87654321",
+                ),
+                db=db,
+                _=admin_user,
+            )
+
+        self.assertEqual(created["email"], "tester@example.com")
+        self.assertEqual(updated["name"], "测试账号2")
+        self.assertEqual(updated["role"], "产品开发")
 
     @patch("app.routers.ops.preview_internal_store_links")
     @patch("app.routers.ops.preview_sellersprite_products")
