@@ -145,5 +145,7 @@ def _serialize_review(review: Review, task: SupplierTask | None) -> dict:
     data["supplier_task_status"] = task.status if task else None
     data["supplier_task_priority"] = task.priority if task else None
     data["supplier_name"] = task.supplier_name if task else None
+    data["supplier_task_suggested_action"] = task.suggested_action if task else None
+    data["supplier_task_actual_rectification"] = task.actual_rectification if task else None
     data["supplier_task_notes"] = task.notes if task else None
     return data

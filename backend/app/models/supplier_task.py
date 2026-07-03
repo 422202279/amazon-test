@@ -19,6 +19,8 @@ class SupplierTask(Base):
     status: Mapped[str] = mapped_column(String(40), default="pending_feedback")
     priority: Mapped[str] = mapped_column(String(20), default="medium")
     due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    suggested_action: Mapped[str | None] = mapped_column(Text, nullable=True)
+    actual_rectification: Mapped[str | None] = mapped_column(Text, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))

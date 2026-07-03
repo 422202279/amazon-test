@@ -68,11 +68,11 @@ let comparisonData = [
 ];
 
 const tasks = [
-  { id: "SR-2048", product: "记忆棉人体工学坐垫", supplier: "宁波舒垫工厂", issue: "质量问题", evidence: "12 条差评指向坐感塌陷，含 7 条带图", priority: "高", status: "处理中", due: "2026-07-08" },
-  { id: "SR-2049", product: "防漏便携咖啡杯", supplier: "厦门啡行", issue: "使用效果差", evidence: "5 条评论反馈杯盖横放渗水", priority: "中", status: "待反馈", due: "2026-07-06" },
-  { id: "SR-2050", product: "不锈钢保温杯 900ml", supplier: "永康饮具厂", issue: "掉色", evidence: "德国站 4 条 1 星评论附图", priority: "高", status: "待反馈", due: "2026-07-05" },
-  { id: "SR-2051", product: "瑜伽垫加厚防滑款", supplier: "南通健身材", issue: "异味", evidence: "日本站 6 条差评集中在拆封异味", priority: "中", status: "观察中", due: "2026-07-12" },
-  { id: "SR-2052", product: "化妆镜带灯便携折叠款", supplier: "深圳美妆科技", issue: "电池续航", evidence: "已完成电池批次替换验证", priority: "低", status: "已整改", due: "2026-06-28" }
+  { id: "SR-2048", product: "记忆棉人体工学坐垫", supplier: "宁波舒垫工厂", issue: "质量问题", evidence: "12 条差评指向坐感塌陷，含 7 条带图", suggestedAction: "先做内芯密度抽检，再给出材料与工艺调整计划", actualRectification: "已增加抽检频次，待回传改良样", priority: "高", status: "处理中", due: "2026-07-08" },
+  { id: "SR-2049", product: "防漏便携咖啡杯", supplier: "厦门啡行", issue: "使用效果差", evidence: "5 条评论反馈杯盖横放渗水", suggestedAction: "复核密封圈与卡扣结构，先出问题定位报告", actualRectification: "待供应商反馈", priority: "中", status: "待反馈", due: "2026-07-06" },
+  { id: "SR-2050", product: "不锈钢保温杯 900ml", supplier: "永康饮具厂", issue: "掉色", evidence: "德国站 4 条 1 星评论附图", suggestedAction: "补做附着力测试并核查表面喷涂工艺", actualRectification: "待供应商反馈", priority: "高", status: "待反馈", due: "2026-07-05" },
+  { id: "SR-2051", product: "瑜伽垫加厚防滑款", supplier: "南通健身材", issue: "异味", evidence: "日本站 6 条差评集中在拆封异味", suggestedAction: "排查材料与包装密封方式，追加散味验证", actualRectification: "观察新批次反馈中", priority: "中", status: "观察中", due: "2026-07-12" },
+  { id: "SR-2052", product: "化妆镜带灯便携折叠款", supplier: "深圳美妆科技", issue: "电池续航", evidence: "已完成电池批次替换验证", suggestedAction: "跟进电池批次替换后的稳定性回访", actualRectification: "已完成电池批次替换", priority: "低", status: "已整改", due: "2026-06-28" }
 ];
 
 const reports = [
@@ -526,6 +526,7 @@ function renderTasks() {
           </div>
           <p>${task.product}</p>
           <p>${task.issue} · ${task.supplier}</p>
+          <span class="cell-sub">建议：${task.suggestedAction}</span>
           <span class="cell-sub">截止：${task.due}</span>
         </article>
       `).join("") || '<p class="cell-sub">当前无任务</p>'}
@@ -539,6 +540,8 @@ function renderTasks() {
       <td>${task.supplier}</td>
       <td>${task.issue}</td>
       <td>${task.evidence}</td>
+      <td>${task.suggestedAction}</td>
+      <td>${task.actualRectification}</td>
       <td><span class="status ${statusClass(task.priority)}">${task.priority}</span></td>
       <td><span class="status ${statusClass(task.status)}">${task.status}</span></td>
       <td>${task.due}</td>
@@ -590,6 +593,7 @@ document.addEventListener("DOMContentLoaded", () => {
   renderReports();
   hydrateLiveData();
   bindReviewViewSwitch();
+  bindComparisonSubmit();
 });
 
 function bindReviewViewSwitch() {
@@ -609,11 +613,22 @@ function bindReviewViewSwitch() {
   });
 }
 
+function bindComparisonSubmit() {
+  const page = document.body.dataset.page;
+  if (page !== "comparison") return;
+  const button = Array.from(document.querySelectorAll(".filters .button")).find((item) => item.textContent.includes("开始对比"));
+  if (!button) return;
+  button.addEventListener("click", async () => {
+    await hydrateComparison();
+  });
+}
+
 async function hydrateLiveData() {
   const page = document.body.dataset.page;
   if (page === "products") await hydrateProducts();
   if (page === "reviews") await hydrateReviews();
   if (page === "comparison") await hydrateComparison();
+  if (page === "supplier-tasks") await hydrateTasks();
 }
 
 async function fetchJson(path) {
@@ -650,12 +665,25 @@ async function hydrateReviews() {
 
 async function hydrateComparison() {
   try {
-    const data = await fetchJson("/products/compare?parent_asin=B0DXSEAT01&limit=20");
+    const textarea = document.querySelector("textarea");
+    const raw = textarea?.value?.trim() || "B0DXSEAT01";
+    const data = await fetchJson(`/products/compare?identifiers=${encodeURIComponent(raw)}&limit=20`);
     if (!data.items?.length) return;
     comparisonData = data.items.map(mapComparisonFromApi);
     renderComparison();
   } catch (error) {
     console.warn("Comparison API unavailable, fallback to mock data", error);
+  }
+}
+
+async function hydrateTasks() {
+  try {
+    const data = await fetchJson("/supplier-tasks?limit=100");
+    if (!data.items?.length) return;
+    tasks.splice(0, tasks.length, ...data.items.map(mapTaskFromApi));
+    renderTasks();
+  } catch (error) {
+    console.warn("Supplier tasks API unavailable, fallback to mock data", error);
   }
 }
 
@@ -734,5 +762,20 @@ function mapComparisonFromApi(item) {
     imageReviews: item.image_review_total ?? "-",
     top3: item.supplier_name || item.category_name || "待补评论问题",
     action: item.buybox_seller ? `关注 ${item.buybox_seller}` : "待生成建议动作",
+  };
+}
+
+function mapTaskFromApi(item) {
+  return {
+    id: item.task_code || `SR-${item.id}`,
+    product: item.product_title || "未命名产品",
+    supplier: item.supplier_name || "待补供应商",
+    issue: item.issue_category || "其他",
+    evidence: item.evidence_summary || "-",
+    suggestedAction: item.suggested_action || "待补建议方案",
+    actualRectification: item.actual_rectification || "待补实际整改",
+    priority: item.priority === "high" ? "高" : item.priority === "medium" ? "中" : "低",
+    status: item.status === "pending_feedback" ? "待反馈" : item.status === "in_progress" ? "处理中" : item.status === "observing" ? "观察中" : item.status === "resolved" ? "已整改" : item.status,
+    due: item.due_date || "-",
   };
 }

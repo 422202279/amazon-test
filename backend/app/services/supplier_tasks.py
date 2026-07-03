@@ -34,6 +34,7 @@ def generate_tasks_from_negative_reviews(db: Session, limit: int = 100) -> dict[
         evidence_summary = _build_evidence_summary(review)
         if existing:
             existing.evidence_summary = evidence_summary
+            existing.suggested_action = existing.suggested_action or _suggest_action_from_issue(review.issue_category)
             updated += 1
         else:
             task_code = f"SR-{(review.id or 0) + 3000}"
@@ -48,6 +49,8 @@ def generate_tasks_from_negative_reviews(db: Session, limit: int = 100) -> dict[
                     status="pending_feedback",
                     priority=_priority_from_review(review),
                     due_date=(datetime.now(UTC) + timedelta(days=7)).date(),
+                    suggested_action=_suggest_action_from_issue(review.issue_category),
+                    actual_rectification=None,
                     notes=f"来源评论ID: {review.review_external_id}",
                 )
             )
@@ -74,3 +77,14 @@ def _priority_from_review(review: Review) -> str:
     if review.star_rating is not None and review.star_rating == 2:
         return "medium"
     return "low"
+
+
+def _suggest_action_from_issue(issue_category: str | None) -> str:
+    mapping = {
+        "质量问题": "建议供应商先做批次抽检，并回传不良原因与改进计划。",
+        "尺寸问题": "建议复核尺寸标注、实物公差，并同步优化详情页说明。",
+        "使用效果差": "建议排查核心材料或结构设计，并提供改良样。",
+        "掉色": "建议补做耐磨与表面附着力测试，确认涂层工艺。",
+        "异味": "建议排查材料来源与包装密封方式，追加散味验证。",
+    }
+    return mapping.get(issue_category or "", "建议先复盘评论证据，再与供应商确认整改动作。")

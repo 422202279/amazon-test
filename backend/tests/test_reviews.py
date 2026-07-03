@@ -205,6 +205,41 @@ class ReviewWorkflowTests(unittest.TestCase):
         self.assertEqual(payload["supplier_task_code"], "SR-9001")
         self.assertEqual(payload["supplier_task_status"], "pending_feedback")
         self.assertEqual(payload["supplier_name"], "Demo Supplier")
+        self.assertEqual(payload["supplier_task_suggested_action"], None)
+
+    def test_generate_supplier_task_sets_suggested_action(self):
+        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
+            workbook_path = tmp.name
+
+        pd.DataFrame(
+            [
+                {
+                    "平台": "Amazon",
+                    "站点": "US",
+                    "店铺": "美国老店",
+                    "ASIN": "B0TEST009",
+                    "产品标题": "Test Product C",
+                    "评论ID": "RV-009",
+                    "星级": 1,
+                    "评论标题": "Broken",
+                    "评论内容": "Broken quickly.",
+                    "问题分类": "质量问题",
+                    "情绪": "负面",
+                    "是否反馈供应商": "N",
+                    "整改状态": "待反馈",
+                    "评论时间": "2026-07-02 11:20:00",
+                }
+            ]
+        ).to_excel(workbook_path, index=False)
+
+        with self.session_factory() as db:
+            import_reviews_from_workbook(db, workbook_path, limit=10)
+            db.commit()
+            generate_tasks_from_negative_reviews(db, limit=10)
+            db.commit()
+            task = db.query(SupplierTask).filter(SupplierTask.asin == "B0TEST009").one()
+
+        self.assertIn("批次抽检", task.suggested_action or "")
 
 
 if __name__ == "__main__":
