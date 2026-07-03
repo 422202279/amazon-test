@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.product_metric import ProductMetricHistory
 from app.serializers import to_dict
+from app.services.import_jobs import create_import_job
 from app.services.product_importer import import_sellersprite_sales_history, preview_sellersprite_sales_history
 
 router = APIRouter(prefix="/metrics", tags=["metrics"])
@@ -34,6 +35,14 @@ def import_sales_history(
     limit: int = 200,
     db: Session = Depends(get_db),
 ):
+    preview_rows = preview_sellersprite_sales_history(path, limit)
     result = import_sellersprite_sales_history(db, path, limit)
+    create_import_job(
+        db,
+        import_type="sellersprite_sales_history",
+        source_name=path,
+        total_rows=len(preview_rows),
+        success_rows=result["created"] + result["updated"],
+    )
     db.commit()
     return {"source": "sellersprite_sales_history", **result}

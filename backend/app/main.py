@@ -4,6 +4,7 @@ from app.config import settings
 from app.database import Base, engine
 from app.routers.health import router as health_router
 from app.routers.metrics import router as metrics_router
+from app.routers.ops import router as ops_router
 from app.routers.products import router as products_router
 from app.routers.reviews import router as reviews_router
 from app.routers.stores import router as stores_router
@@ -19,4 +20,5 @@ def create_app() -> FastAPI:
     app.include_router(reviews_router, prefix=settings.api_prefix)
     app.include_router(supplier_tasks_router, prefix=settings.api_prefix)
     app.include_router(metrics_router, prefix=settings.api_prefix)
+    app.include_router(ops_router, prefix=settings.api_prefix)
     return app

@@ -31,6 +31,21 @@
 - `GET /api/metrics`
 - `GET /api/metrics/import-preview/sales-history`
 - `POST /api/metrics/import/sales-history`
+- `GET /api/ops/import-jobs`
+- `GET /api/ops/data-quality`
+
+## 新增的导入校验能力
+
+现在每次产品或评论导入，都会额外生成：
+
+- 导入记录：来源文件、总行数、成功行数、失败行数、状态
+- 质量摘要：缺少主键、缺少链接、评分异常、星级异常等警告统计
+
+适用场景：
+
+- 先人工导入评论，再由系统提示哪些行不完整
+- 判断某次 Excel 导入是否足够干净，可以放心用于报表
+- 为后续前端做“导入记录”和“数据健康度”页面提供接口基础
 
 ## 本地启动
 

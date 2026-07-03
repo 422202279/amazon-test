@@ -8,9 +8,12 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.database import Base
+from app.models.import_job import ImportJob
 from app.models.product import Product
 from app.models.product_metric import ProductMetricHistory
 from app.models.store import Store
+from app.services.data_quality import validate_product_rows
+from app.services.import_jobs import create_import_job
 from app.services.product_importer import (
     import_internal_store_products,
     import_sellersprite_products,
@@ -92,6 +95,49 @@ class ImporterTests(unittest.TestCase):
 
         self.assertGreaterEqual(result["created"], 5)
         self.assertEqual(product_count, result["created"] + result["updated"])
+
+    def test_product_quality_summary_flags_missing_identifiers(self):
+        rows = [
+            {
+                "platform": "Amazon",
+                "site_code": "US",
+                "title": "Test Product",
+                "asin": None,
+                "sku": None,
+                "department_item_no": None,
+                "product_url": None,
+                "rating": 6.2,
+                "monthly_sales": 10,
+                "review_count": 3,
+            }
+        ]
+
+        summary = validate_product_rows(rows)
+
+        self.assertEqual(summary["warning_rows"], 1)
+        self.assertEqual(summary["issue_counts"]["missing_identifier"], 1)
+        self.assertEqual(summary["issue_counts"]["missing_product_url"], 1)
+        self.assertEqual(summary["issue_counts"]["invalid_rating"], 1)
+
+    def test_create_import_job_persists_warning_summary(self):
+        with self.session_factory() as db:
+            job = create_import_job(
+                db,
+                import_type="internal_store_products",
+                source_name="demo.xlsx",
+                total_rows=5,
+                success_rows=5,
+                warning_rows=2,
+                issue_summary={"issue_counts": {"missing_product_url": 2}},
+            )
+            db.commit()
+            saved = db.query(ImportJob).filter(ImportJob.id == job.id).one()
+
+        self.assertEqual(saved.status, "warning")
+        self.assertEqual(saved.total_rows, 5)
+        self.assertEqual(saved.success_rows, 5)
+        self.assertEqual(saved.failed_rows, 0)
+        self.assertIn("missing_product_url", saved.error_summary)
 
 
 if __name__ == "__main__":

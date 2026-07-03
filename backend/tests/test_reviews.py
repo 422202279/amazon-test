@@ -10,6 +10,7 @@ from sqlalchemy.orm import sessionmaker
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.database import Base
+from app.services.data_quality import build_data_quality_summary, validate_review_rows
 from app.models.review import Review
 from app.models.supplier_task import SupplierTask
 from app.services.review_importer import (
@@ -125,6 +126,54 @@ class ReviewWorkflowTests(unittest.TestCase):
         self.assertEqual(review_count, 2)
         self.assertEqual(task_result["created"], 1)
         self.assertEqual(task_count, 1)
+
+    def test_review_quality_summary_flags_missing_review_fields(self):
+        rows = [
+            {
+                "platform": "Amazon",
+                "site_code": "US",
+                "asin": None,
+                "review_external_id": None,
+                "review_url": None,
+                "review_content": None,
+                "star_rating": None,
+                "is_negative_review": True,
+                "issue_category": None,
+            }
+        ]
+
+        summary = validate_review_rows(rows)
+
+        self.assertEqual(summary["warning_rows"], 1)
+        self.assertEqual(summary["issue_counts"]["missing_review_identifier"], 1)
+        self.assertEqual(summary["issue_counts"]["missing_review_url"], 1)
+        self.assertEqual(summary["issue_counts"]["missing_asin"], 1)
+        self.assertEqual(summary["issue_counts"]["invalid_star_rating"], 1)
+
+    def test_data_quality_summary_aggregates_database_state(self):
+        with self.session_factory() as db:
+            db.add(
+                Review(
+                    platform="Amazon",
+                    site_code="US",
+                    asin=None,
+                    review_external_id="RV-100",
+                    review_url=None,
+                    review_content="bad",
+                    star_rating=1,
+                    is_negative_review=True,
+                    issue_category=None,
+                    source_type="manual_import",
+                )
+            )
+            db.commit()
+            summary = build_data_quality_summary(db)
+
+        self.assertEqual(summary["reviews"]["total"], 1)
+        self.assertEqual(summary["reviews"]["negative_total"], 1)
+        self.assertEqual(summary["reviews"]["missing_review_url"], 1)
+        self.assertEqual(summary["reviews"]["missing_asin"], 1)
+        self.assertEqual(summary["reviews"]["missing_issue_category_on_negative"], 1)
 
 
 if __name__ == "__main__":
