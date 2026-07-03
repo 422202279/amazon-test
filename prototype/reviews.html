@@ -71,6 +71,10 @@
             <label>供应商反馈</label>
             <select><option>全部</option><option>已反馈</option><option>未反馈</option></select>
           </div>
+          <div class="filter-row">
+            <label>统计周期</label>
+            <select><option>全部</option><option>近 30 天</option><option>近 60 天</option><option>近 90 天</option><option>近半年</option></select>
+          </div>
           <div class="filter-row filter-search wide">
             <label>搜索</label>
             <input type="text" placeholder="评论内容 / 评论人 / ASIN / SKU / 标题；支持多 ASIN / SKU，逗号、中文逗号、换行或空格分隔" />
@@ -84,13 +88,14 @@
           <div class="summary-pill">带图评论 592</div>
           <div class="summary-pill warn">未反馈供应商 67</div>
           <div class="summary-pill">新增评论 145</div>
+          <div class="summary-pill"><a href="./templates/review-import-template.xlsx">下载评论导入模板</a></div>
         </section>
 
         <section class="panel">
           <div class="panel-head">
             <div>
               <h2>评论总表主视图</h2>
-              <p>重点原型页面，突出筛选效率、图片缩略图、评论正文和供应商闭环字段</p>
+              <p>重点原型页面，突出筛选效率、图片缩略图、评论正文和供应商闭环字段；视频仅保留封面图和原评论链接</p>
             </div>
             <div class="segmented">
               <button class="active">表格视图</button>

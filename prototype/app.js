@@ -97,18 +97,22 @@ function thumbs(count = 3) {
 
 function renderReviewMedia(review, count = 3) {
   if (!review.hasImage) return '<span class="cell-sub">无图 / 无视频</span>';
-  const mediaClass = review.mediaType === "video" ? "is-video" : "";
-  const hint = review.mediaType === "video" ? "视频封面，点击跳转原评论查看" : "点击查看原评论图片";
-  const label = review.mediaType === "video" ? "视频封面" : "评论图片";
+  const mediaMarkup = Array.from({ length: count }, (_, index) => `
+    <span class="thumb media-thumb ${review.tone} ${review.mediaType === "video" ? "is-video" : ""}">
+      ${review.mediaType === "video" && index === 0 ? '<span class="media-play">▶</span>' : ""}
+    </span>
+  `).join("");
+  if (review.mediaType === "video") {
+    return `
+      <a class="thumb-strip media-link" href="${review.reviewUrl || "#"}" target="_blank" rel="noreferrer" title="仅视频跳转原评论查看">
+        ${mediaMarkup}
+      </a>
+      <span class="cell-sub media-hint">视频仅保存封面图，点击跳转原评论观看</span>
+    `;
+  }
   return `
-    <a class="thumb-strip media-link" href="${review.reviewUrl || "#"}" target="_blank" rel="noreferrer" title="${hint}">
-      ${Array.from({ length: count }, (_, index) => `
-        <span class="thumb media-thumb ${review.tone} ${mediaClass}">
-          ${review.mediaType === "video" && index === 0 ? '<span class="media-play">▶</span>' : ""}
-        </span>
-      `).join("")}
-    </a>
-    <span class="cell-sub media-hint">${label} · 点击跳转评论详情</span>
+    <span class="thumb-strip">${mediaMarkup}</span>
+    <span class="cell-sub media-hint">图片缩略图本地展示，不默认跳转</span>
   `;
 }
 
