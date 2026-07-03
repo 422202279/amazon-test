@@ -88,6 +88,10 @@ python main.py
 - 默认本地管理员：
   - 账号：`admin@cb-monitor.local`
   - 密码：`admin123456`
+- 一键启动后端：
+  - `bash scripts/run_local_stack.sh`
+- 后端启动后，一键跑本地全流程冒烟：
+  - `python3 scripts/local_smoke_test.py`
 
 ## 当前已打通的本地闭环
 
