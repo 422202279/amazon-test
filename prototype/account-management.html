@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>账号管理 | CrossBorder Store Review Monitor Lite</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body data-page="account-management">
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">CB</div>
+          <div>
+            <strong>Review Monitor Lite</strong>
+            <p>跨境店铺评论监控</p>
+          </div>
+        </div>
+        <nav class="nav">
+          <a class="nav-item" href="./index.html">首页 Dashboard</a>
+          <a class="nav-item" href="./stores.html">店铺管理</a>
+          <a class="nav-item" href="./products.html">产品总表</a>
+          <a class="nav-item" href="./reviews.html">评论总表</a>
+          <a class="nav-item" href="./comparison.html">同款多店铺评论对比</a>
+          <a class="nav-item" href="./product-detail.html">产品详情</a>
+          <a class="nav-item" href="./supplier-tasks.html">供应商整改任务</a>
+          <a class="nav-item" href="./reports.html">报告中心</a>
+          <a class="nav-item" href="./settings.html">设置</a>
+          <a class="nav-item active" href="./account-management.html">账号管理</a>
+        </nav>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <h1>账号管理</h1>
+            <p>后台建议保持轻量，先做账号、角色、模块权限、登录策略四块即可</p>
+          </div>
+          <div class="topbar-actions">
+            <button class="button ghost">批量停用</button>
+            <button class="button ghost">导出账号列表</button>
+            <button class="button primary">新增账号</button>
+          </div>
+        </header>
+
+        <section class="table-summary">
+          <div class="summary-pill" id="accounts-summary-total">账号数 4</div>
+          <div class="summary-pill" id="accounts-summary-active">启用中 3</div>
+          <div class="summary-pill" id="accounts-summary-pd">产品开发 1</div>
+          <div class="summary-pill warn" id="accounts-summary-disabled">停用 1</div>
+          <div class="summary-pill" id="accounts-summary-backend">后台建议：轻量账号体系即可</div>
+        </section>
+
+        <section class="two-col">
+          <div class="panel">
+            <div class="panel-head compact">
+              <h2>登录与安全策略</h2>
+              <span class="chip success">简单后台</span>
+            </div>
+            <div class="setting-list" id="security-settings">
+              <div><strong>登录方式</strong><span>账号密码登录</span></div>
+              <div><strong>部署方式</strong><span>轻量后台即可</span></div>
+              <div><strong>密码策略</strong><span>8位以上，含字母和数字</span></div>
+              <div><strong>二次验证</strong><span>V1 可不启用</span></div>
+              <div><strong>会话策略</strong><span>7天内保持登录</span></div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head compact">
+              <h2>后台范围建议</h2>
+              <span class="chip neutral">最小可用</span>
+            </div>
+            <div class="setting-list">
+              <div><strong>必须有</strong><span>登录、退出、账号列表、角色分配、重置密码</span></div>
+              <div><strong>建议有</strong><span>最近登录时间、账号状态、可访问店铺范围</span></div>
+              <div><strong>先不做</strong><span>复杂审批、多组织树、企业微信单点登录</span></div>
+              <div><strong>适配人数</strong><span>个人 / 2~5人小团队足够用</span></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>账号列表</h2>
+              <p>建议先按角色 + 可访问店铺做控制，不必一开始做到字段级权限</p>
+            </div>
+            <span class="chip neutral" id="accounts-note">V1 轻量账号模型</span>
+          </div>
+          <div class="table-wrap table-wide">
+            <table>
+              <thead>
+                <tr>
+                  <th>账号</th>
+                  <th>角色</th>
+                  <th>可访问范围</th>
+                  <th>绑定店铺</th>
+                  <th>状态</th>
+                  <th>最近登录</th>
+                  <th>操作建议</th>
+                </tr>
+              </thead>
+              <tbody id="accounts-table"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>角色权限矩阵</h2>
+              <p>推荐只做模块级权限，后续确实需要再细化到按钮级</p>
+            </div>
+            <span class="chip warn">先简后细</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>角色</th>
+                  <th>可访问模块</th>
+                  <th>主要权限</th>
+                </tr>
+              </thead>
+              <tbody id="roles-table"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script src="./app.js"></script>
+  </body>
+</html>

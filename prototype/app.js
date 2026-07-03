@@ -95,6 +95,21 @@ const reports = [
   { name: "北美站购物车异常报告", type: "风险报告", range: "美国 / 加拿大", time: "2026-06-29 09:40", status: "待复核" }
 ];
 
+let accounts = [
+  { name: "系统管理员", email: "admin@cb-monitor.local", role: "管理员", scope: "全部店铺 / 全部模块", stores: ["US Home Store", "UK Living", "JP Kitchen", "CA Comfort"], status: "启用", lastLogin: "2026-07-03 09:12" },
+  { name: "产品开发A", email: "pd-a@cb-monitor.local", role: "产品开发", scope: "产品总表 / 评论总表 / 产品开发 / 供应商整改", stores: ["US Home Store", "CA Comfort"], status: "启用", lastLogin: "2026-07-03 08:46" },
+  { name: "运营同事B", email: "ops-b@cb-monitor.local", role: "运营", scope: "店铺 / 产品 / 评论 / 报告导出", stores: ["UK Living", "DE Ordnung", "FR Maison"], status: "启用", lastLogin: "2026-07-02 19:35" },
+  { name: "韩国数据专员", email: "kr-data@cb-monitor.local", role: "数据录入", scope: "韩国站产品 / 评论导入", stores: ["Coupang Seoul", "Naver Living"], status: "停用", lastLogin: "2026-06-29 14:18" },
+];
+
+let roles = [
+  { role: "管理员", modules: ["Dashboard", "店铺", "产品", "评论", "对比", "整改", "报告", "设置", "账号管理"], permissions: ["查看", "导入", "导出", "编辑", "删除", "手动更新", "角色分配"] },
+  { role: "产品开发", modules: ["Dashboard", "产品", "评论", "对比", "产品开发", "整改", "报告"], permissions: ["查看", "导出", "标记问题", "生成整改建议"] },
+  { role: "运营", modules: ["Dashboard", "店铺", "产品", "评论", "报告"], permissions: ["查看", "导入", "导出", "批量分类"] },
+  { role: "数据录入", modules: ["产品", "评论", "韩国手动导入"], permissions: ["查看", "导入"] },
+  { role: "只读访客", modules: ["Dashboard", "报告"], permissions: ["查看"] },
+];
+
 let reviewViewMode = "timeline";
 
 function statusClass(status) {
@@ -827,6 +842,44 @@ function renderReports() {
   `).join("");
 }
 
+function renderAccountManagement() {
+  const accountTable = document.getElementById("accounts-table");
+  const rolesTable = document.getElementById("roles-table");
+  if (!accountTable || !rolesTable) return;
+
+  accountTable.innerHTML = accounts.map((account) => `
+    <tr>
+      <td>
+        <span class="cell-title">${account.name}</span>
+        <span class="cell-sub">${account.email}</span>
+      </td>
+      <td><span class="chip ${account.role === "管理员" ? "danger" : account.role === "产品开发" ? "warn" : "neutral"}">${account.role}</span></td>
+      <td>${account.scope}</td>
+      <td>${(account.stores || []).join(" / ")}</td>
+      <td><span class="status ${account.status === "启用" ? "success" : "danger"}">${account.status}</span></td>
+      <td>${account.lastLogin}</td>
+      <td>重置密码 / 调整角色 / ${account.status === "启用" ? "可停用" : "可启用"}</td>
+    </tr>
+  `).join("");
+
+  rolesTable.innerHTML = roles.map((role) => `
+    <tr>
+      <td>${role.role}</td>
+      <td>${role.modules.join(" / ")}</td>
+      <td>${role.permissions.join(" / ")}</td>
+    </tr>
+  `).join("");
+
+  const total = document.getElementById("accounts-summary-total");
+  const active = document.getElementById("accounts-summary-active");
+  const pd = document.getElementById("accounts-summary-pd");
+  const disabled = document.getElementById("accounts-summary-disabled");
+  if (total) total.textContent = `账号数 ${accounts.length}`;
+  if (active) active.textContent = `启用中 ${accounts.filter((item) => item.status === "启用").length}`;
+  if (pd) pd.textContent = `产品开发 ${accounts.filter((item) => item.role === "产品开发").length}`;
+  if (disabled) disabled.textContent = `停用 ${accounts.filter((item) => item.status !== "启用").length}`;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   restoreProductColumns();
   renderDashboard();
@@ -838,8 +891,10 @@ document.addEventListener("DOMContentLoaded", () => {
   renderDetail();
   renderTasks();
   renderReports();
+  renderAccountManagement();
   hydrateLiveData();
   hydrateScheduleSettings();
+  hydrateAdminData();
   bindProductFilters();
   bindReviewFilters();
   bindReviewViewSwitch();
@@ -1022,6 +1077,53 @@ async function hydrateScheduleSettings() {
     maxTimes.textContent = `最多 ${data.max_schedule_times || 3} 个，建议只加重点时段，不做高频轮询`;
   } catch (error) {
     console.warn("Schedule settings API unavailable, fallback to static text", error);
+  }
+}
+
+async function hydrateAdminData() {
+  const page = document.body.dataset.page;
+  if (page !== "account-management") return;
+  try {
+    const [userData, roleData, securityData] = await Promise.all([
+      fetchJson("/admin/users"),
+      fetchJson("/admin/roles"),
+      fetchJson("/admin/security"),
+    ]);
+    if (userData.items?.length) {
+      accounts = userData.items.map((item) => ({
+        name: item.name,
+        email: item.email,
+        role: item.role,
+        scope: item.scope,
+        stores: item.stores || [],
+        status: item.status,
+        lastLogin: item.last_login || "-",
+      }));
+    }
+    if (roleData.items?.length) {
+      roles = roleData.items.map((item) => ({
+        role: item.role,
+        modules: item.modules || [],
+        permissions: item.permissions || [],
+      }));
+    }
+    const note = document.getElementById("accounts-note");
+    if (note && userData.notes) note.textContent = userData.notes;
+    const backendAdvice = document.getElementById("accounts-summary-backend");
+    if (backendAdvice && securityData.deploy_mode) backendAdvice.textContent = `后台建议：${securityData.deploy_mode}`;
+    const security = document.getElementById("security-settings");
+    if (security) {
+      security.innerHTML = `
+        <div><strong>登录方式</strong><span>${securityData.login_mode || "账号密码登录"}</span></div>
+        <div><strong>部署方式</strong><span>${securityData.deploy_mode || "轻量后台即可"}</span></div>
+        <div><strong>密码策略</strong><span>${securityData.password_policy || "8位以上，含字母和数字"}</span></div>
+        <div><strong>二次验证</strong><span>${securityData.mfa || "V1 可不启用"}</span></div>
+        <div><strong>会话策略</strong><span>${securityData.session_policy || "7天内保持登录"}</span></div>
+      `;
+    }
+    renderAccountManagement();
+  } catch (error) {
+    console.warn("Admin API unavailable, fallback to local mock data", error);
   }
 }
 
