@@ -562,11 +562,56 @@ tbody tr:hover {
 .thumb-strip {
   display: flex;
   gap: 8px;
+  align-items: center;
+  width: fit-content;
 }
 
 .thumb-strip .thumb {
   width: 38px;
   height: 38px;
+}
+
+.media-link {
+  display: inline-flex;
+  padding: 2px 0;
+}
+
+.media-thumb {
+  position: relative;
+  overflow: hidden;
+}
+
+.media-thumb.is-video {
+  background: linear-gradient(145deg, #d8e4f7, #b7c7e8);
+}
+
+.media-thumb.is-video::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(16, 27, 44, 0.02), rgba(16, 27, 44, 0.22));
+}
+
+.media-play {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.92);
+  color: #17335c;
+  font-size: 10px;
+  box-shadow: 0 6px 14px rgba(18, 36, 65, 0.12);
+}
+
+.media-hint {
+  display: block;
+  margin-top: 6px;
 }
 
 .spark-group,
