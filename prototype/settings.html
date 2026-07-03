@@ -146,6 +146,49 @@
             </div>
           </div>
         </section>
+
+        <section class="two-col">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>数据接入能力面板</h2>
+                <p>直接标清哪些站点适合自动、哪些只能手动，避免后续误判</p>
+              </div>
+              <span class="chip warn">先保准确性</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>平台</th>
+                    <th>覆盖范围</th>
+                    <th>产品数据</th>
+                    <th>评论数据</th>
+                    <th>自动化等级</th>
+                  </tr>
+                </thead>
+                <tbody id="source-capabilities-table"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>云部署最低配建议</h2>
+                <p>按最低成本、够用优先的思路，为明后天部署做准备</p>
+              </div>
+              <span class="chip success">可落地</span>
+            </div>
+            <div class="setting-list" id="deployment-profile">
+              <div><strong>适用规模</strong><span>个人 / 2~5 人小团队</span></div>
+              <div><strong>服务器</strong><span>2核2G 即可</span></div>
+              <div><strong>运行栈</strong><span>FastAPI / SQLite / Nginx / systemd</span></div>
+              <div><strong>证书</strong><span>Let's Encrypt 免费证书</span></div>
+              <div><strong>图片策略</strong><span>缩略图优先，视频只留封面图和链接</span></div>
+            </div>
+          </div>
+        </section>
       </main>
     </div>
     <script src="./app.js"></script>

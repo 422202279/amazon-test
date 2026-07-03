@@ -34,6 +34,13 @@
 - `POST /api/metrics/import/sales-history`
 - `GET /api/ops/import-jobs`
 - `GET /api/ops/data-quality`
+- `GET /api/ops/schedule-settings`
+- `POST /api/ops/manual-refresh`
+- `GET /api/ops/source-capabilities`
+- `GET /api/ops/deployment-profile`
+- `GET /api/admin/users`
+- `GET /api/admin/roles`
+- `GET /api/admin/security`
 
 ## 新增的导入校验能力
 
@@ -73,3 +80,13 @@ source .venv/bin/activate
 pip install -r requirements.txt
 python main.py
 ```
+
+## 云部署准备
+
+仓库已补充最低配部署骨架：
+
+- `.env.example`
+- `deploy/bootstrap.sh`
+- `deploy/systemd/cb-monitor.service`
+- `deploy/nginx/cb-monitor.conf`
+- `docs/cloud-deployment-minimum-plan.md`

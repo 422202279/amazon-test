@@ -880,6 +880,20 @@ function renderAccountManagement() {
   if (disabled) disabled.textContent = `停用 ${accounts.filter((item) => item.status !== "启用").length}`;
 }
 
+function renderSourceCapabilities(items) {
+  const table = document.getElementById("source-capabilities-table");
+  if (!table) return;
+  table.innerHTML = items.map((item) => `
+    <tr>
+      <td>${item.platform}</td>
+      <td>${item.coverage}</td>
+      <td>${item.product_mode}</td>
+      <td>${item.review_mode}</td>
+      <td><span class="chip ${item.cloud_ready ? "success" : "warn"}">${item.automation_level}</span></td>
+    </tr>
+  `).join("");
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   restoreProductColumns();
   renderDashboard();
@@ -894,6 +908,7 @@ document.addEventListener("DOMContentLoaded", () => {
   renderAccountManagement();
   hydrateLiveData();
   hydrateScheduleSettings();
+  hydrateOpsInsights();
   hydrateAdminData();
   bindProductFilters();
   bindReviewFilters();
@@ -1077,6 +1092,32 @@ async function hydrateScheduleSettings() {
     maxTimes.textContent = `最多 ${data.max_schedule_times || 3} 个，建议只加重点时段，不做高频轮询`;
   } catch (error) {
     console.warn("Schedule settings API unavailable, fallback to static text", error);
+  }
+}
+
+async function hydrateOpsInsights() {
+  const page = document.body.dataset.page;
+  if (page !== "settings") return;
+  try {
+    const [sources, deployment] = await Promise.all([
+      fetchJson("/ops/source-capabilities"),
+      fetchJson("/ops/deployment-profile"),
+    ]);
+    if (sources.items?.length) {
+      renderSourceCapabilities(sources.items);
+    }
+    const profile = document.getElementById("deployment-profile");
+    if (profile) {
+      profile.innerHTML = `
+        <div><strong>适用规模</strong><span>${deployment.target_scale || "个人 / 2~5 人小团队"}</span></div>
+        <div><strong>服务器</strong><span>${deployment.minimum_server || "2核2G 即可"}</span></div>
+        <div><strong>运行栈</strong><span>${(deployment.runtime || []).join(" / ") || "FastAPI / SQLite / Nginx / systemd"}</span></div>
+        <div><strong>证书</strong><span>${deployment.ssl_plan || "Let's Encrypt 免费证书"}</span></div>
+        <div><strong>图片策略</strong><span>${deployment.storage_strategy || "缩略图优先，视频只留封面图和链接"}</span></div>
+      `;
+    }
+  } catch (error) {
+    console.warn("Ops insight API unavailable, fallback to static settings copy", error);
   }
 }
 

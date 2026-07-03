@@ -1,0 +1,16 @@
+[Unit]
+Description=CrossBorder Store Review Monitor Lite
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/cb-monitor/backend
+EnvironmentFile=/opt/cb-monitor/.env
+ExecStart=/opt/cb-monitor/backend/.venv/bin/uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=5
+User=www-data
+Group=www-data
+
+[Install]
+WantedBy=multi-user.target
