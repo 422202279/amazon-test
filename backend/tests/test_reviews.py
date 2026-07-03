@@ -10,6 +10,7 @@ from sqlalchemy.orm import sessionmaker
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.database import Base
+from app.routers.reviews import _serialize_review
 from app.services.data_quality import build_data_quality_summary, validate_review_rows
 from app.models.review import Review
 from app.models.supplier_task import SupplierTask
@@ -174,6 +175,36 @@ class ReviewWorkflowTests(unittest.TestCase):
         self.assertEqual(summary["reviews"]["missing_review_url"], 1)
         self.assertEqual(summary["reviews"]["missing_asin"], 1)
         self.assertEqual(summary["reviews"]["missing_issue_category_on_negative"], 1)
+
+    def test_review_timeline_serializer_includes_supplier_task_summary(self):
+        review = Review(
+            platform="Amazon",
+            site_code="US",
+            store_name="美国老店",
+            asin="B0TEST001",
+            product_title="Test Product A",
+            review_external_id="RV-001",
+            review_content="bad",
+            review_title="bad",
+            is_negative_review=True,
+            issue_category="质量问题",
+        )
+        task = SupplierTask(
+            task_code="SR-9001",
+            asin="B0TEST001",
+            product_title="Test Product A",
+            supplier_name="Demo Supplier",
+            issue_category="质量问题",
+            status="pending_feedback",
+            priority="high",
+            notes="待给供应商建议方案",
+        )
+
+        payload = _serialize_review(review, task)
+
+        self.assertEqual(payload["supplier_task_code"], "SR-9001")
+        self.assertEqual(payload["supplier_task_status"], "pending_feedback")
+        self.assertEqual(payload["supplier_name"], "Demo Supplier")
 
 
 if __name__ == "__main__":

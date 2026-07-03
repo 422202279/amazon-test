@@ -22,6 +22,7 @@ from app.services.product_importer import (
     preview_internal_store_links,
     preview_sellersprite_sales_history,
 )
+from app.services.query_helpers import split_identifier_terms
 
 
 INTERNAL_WORKBOOK = "/Users/jcc_mac/Documents/A新禾亚马逊一部/产品信息汇总表 新系统一些SKU加点版本_在售版本汇总.xlsx"
@@ -138,6 +139,10 @@ class ImporterTests(unittest.TestCase):
         self.assertEqual(saved.success_rows, 5)
         self.assertEqual(saved.failed_rows, 0)
         self.assertIn("missing_product_url", saved.error_summary)
+
+    def test_split_identifier_terms_accepts_multiple_delimiters(self):
+        terms = split_identifier_terms("B0AAA11111, SKU-1，SKU-2\nB0AAA11111  SKU-3")
+        self.assertEqual(terms, ["B0AAA11111", "SKU-1", "SKU-2", "SKU-3"])
 
 
 if __name__ == "__main__":

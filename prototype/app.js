@@ -10,7 +10,9 @@ const stores = [
   { name: "EU Hybrid", platform: "Amazon", site: "欧洲混合", seller: "A1EUHYBRID", products: 9, reviews: 98, rating: 3.9, status: "正常监控", sync: "2026-07-02 06:58" }
 ];
 
-const products = [
+const API_BASE = "http://127.0.0.1:8000/api";
+
+let products = [
   { tone: "tone-1", name: "记忆棉人体工学坐垫", asin: "B0DXSEAT01", parentAsin: "B0DXSEAT00", sku: "CUS-01-US", store: "US Home Store", site: "美国", platform: "Amazon", category: "Home & Kitchen", price: "$29.99", sales: 642, salesAmount: "$19,253", reviews: 1284, newReviews: 36, rating: 4.1, imageReviews: 93, variantCount: 4, keywords: "seat cushion / office cushion", bsr: "#1,248 / #13", dimensions: "45 x 35 x 7 cm / 1.1 kg", fulfillment: "FBA", sellerCount: 2, buybox: "异常", buyboxSeller: "BestHouse US", adFlags: "SP / 视频", contentFlags: "A+ / 品牌店铺", negative: "12 条", issue: "坐感塌陷 / 尺寸偏小", supplier: "宁波舒垫工厂", launchDate: "2026-03-12", rectify: "处理中" },
   { tone: "tone-2", name: "防漏便携咖啡杯", asin: "B0DXMUG889", parentAsin: "B0DXMUG800", sku: "MUG-02-UK", store: "UK Living", site: "英国", platform: "Amazon", category: "Kitchen & Dining", price: "£18.90", sales: 411, salesAmount: "£7,768", reviews: 986, newReviews: 18, rating: 4.3, imageReviews: 54, variantCount: 3, keywords: "travel mug / leak proof mug", bsr: "#2,904 / #41", dimensions: "510 ml / 370 g", fulfillment: "FBA", sellerCount: 1, buybox: "正常", buyboxSeller: "UK Living", adFlags: "SP", contentFlags: "A+ / 视频", negative: "4 条", issue: "漏水 / 杯盖卡扣", supplier: "厦门啡行", launchDate: "2025-11-09", rectify: "观察中" },
   { tone: "tone-3", name: "不锈钢保温杯 900ml", asin: "B0DXTHERM7", parentAsin: "B0DXTHERM0", sku: "BOT-09-DE", store: "DE Ordnung", site: "德国", platform: "Amazon", category: "Sports & Outdoors", price: "€23.50", sales: 372, salesAmount: "€8,742", reviews: 744, newReviews: 24, rating: 3.9, imageReviews: 48, variantCount: 2, keywords: "thermo bottle / trinkflasche", bsr: "#4,512 / #67", dimensions: "900 ml / 420 g", fulfillment: "FBA", sellerCount: 3, buybox: "正常", buyboxSeller: "Pet Prime DE", adFlags: "SP / SB", contentFlags: "A+", negative: "9 条", issue: "保温差 / 涂层掉色", supplier: "永康饮具厂", launchDate: "2025-08-18", rectify: "待反馈" },
@@ -49,7 +51,7 @@ const productColumns = [
 
 const productColumnStorageKey = "cb-product-columns-v1";
 
-const reviews = [
+let reviews = [
   { tone: "tone-1", id: "RV-10021", title: "坐两天就塌了", product: "记忆棉人体工学坐垫", store: "US Home Store", site: "美国", platform: "Amazon", stars: 2, hasImage: true, mediaType: "image", reviewUrl: "https://www.amazon.com/product-reviews/B0DXSEAT01", productUrl: "https://www.amazon.com/dp/B0DXSEAT01", content: "刚开始还可以，坐了几天中间明显塌陷，尾椎支撑不够，和图片有差距。", issue: "质量问题", mood: "负面", feedback: "未反馈", rectify: "待反馈", source: "页面补抓", asin: "B0DXSEAT01" },
   { tone: "tone-2", id: "RV-10022", title: "杯盖还是会漏", product: "防漏便携咖啡杯", store: "UK Living", site: "英国", platform: "Amazon", stars: 3, hasImage: true, mediaType: "video", reviewUrl: "https://www.amazon.co.uk/product-reviews/B0DXMUG889", productUrl: "https://www.amazon.co.uk/dp/B0DXMUG889", content: "保温不错，但背包里横放后杯盖附近还是会渗水，不适合通勤。", issue: "使用效果差", mood: "中性", feedback: "已反馈", rectify: "处理中", source: "导入", asin: "B0DXMUG889" },
   { tone: "tone-3", id: "RV-10023", title: "颜色掉漆", product: "不锈钢保温杯 900ml", store: "DE Ordnung", site: "德国", platform: "Amazon", stars: 1, hasImage: true, mediaType: "image", reviewUrl: "https://www.amazon.de/product-reviews/B0DXTHERM7", productUrl: "https://www.amazon.de/dp/B0DXTHERM7", content: "用了不到一周表面开始掉色，图片里看着很高级，实物做工一般。", issue: "掉色", mood: "负面", feedback: "未反馈", rectify: "待反馈", source: "页面补抓", asin: "B0DXTHERM7" },
@@ -58,7 +60,7 @@ const reviews = [
   { tone: "tone-6", id: "RV-10026", title: "尺寸偏小", product: "记忆棉人体工学坐垫", store: "Coupang Seoul", site: "韩国", platform: "Coupang", stars: 2, hasImage: true, mediaType: "video", reviewUrl: "https://www.amazon.com/product-reviews/B0DXSEAT01", productUrl: "https://www.amazon.com/dp/B0DXSEAT01", content: "看图以为会更宽，放在办公室椅子上略小，长时间坐不太稳。", issue: "尺寸问题", mood: "负面", feedback: "已反馈", rectify: "处理中", source: "人工修正", asin: "B0DXSEAT01" }
 ];
 
-const comparisonData = [
+let comparisonData = [
   { store: "US Home Store", site: "美国", sales: 642, salesAmount: "$19,253", score: 4.1, negative: 8.6, volume: 1284, imageReviews: 93, top3: "坐感塌陷 / 尺寸偏小 / 回弹慢", action: "调整内芯密度与文案说明" },
   { store: "UK Living", site: "英国", sales: 411, salesAmount: "£7,768", score: 4.3, negative: 5.1, volume: 816, imageReviews: 48, top3: "尺寸偏小 / 包装褶皱 / 回弹慢", action: "优化尺寸图与包装说明" },
   { store: "DE Ordnung", site: "德国", sales: 372, salesAmount: "€8,742", score: 3.8, negative: 11.9, volume: 604, imageReviews: 52, top3: "坐感塌陷 / 描述不符 / 物流破损", action: "排查批次与物流包装" },
@@ -79,6 +81,8 @@ const reports = [
   { name: "6 月供应商整改建议汇总", type: "供应商建议", range: "8 个产品 / 5 家供应商", time: "2026-06-30 17:00", status: "可导出" },
   { name: "北美站购物车异常报告", type: "风险报告", range: "美国 / 加拿大", time: "2026-06-29 09:40", status: "待复核" }
 ];
+
+let reviewViewMode = "timeline";
 
 function statusClass(status) {
   if (["正常监控", "已整改", "最新", "可导出", "已关闭"].includes(status)) return "success";
@@ -370,6 +374,38 @@ function restoreProductColumns() {
 function renderReviews() {
   const body = document.getElementById("reviews-table");
   if (!body) return;
+  if (reviewViewMode === "product" && reviews[0]?.recent_reviews) {
+    body.innerHTML = reviews.map((group) => `
+      <tr>
+        <td>
+          <div class="review-meta">
+            <span class="thumb tone-1"></span>
+            <div>
+              <span class="cell-title">${group.asin || "未识别ASIN"}</span>
+              <span class="cell-sub">${group.product_title || "未命名产品"}</span>
+              <span class="cell-sub">最近评论：${group.latest_reviewed_at || "未记录"}</span>
+            </div>
+          </div>
+        </td>
+        <td>
+          <span class="cell-title">${(group.stores || []).join(" / ") || "未识别店铺"}</span>
+          <span class="cell-sub">${(group.sites || []).join(" / ") || "未识别站点"}</span>
+          <span class="cell-sub">评论数 ${group.review_count} · 差评 ${group.negative_review_count}</span>
+        </td>
+        <td>${(group.sites || []).join(" / ")}<span class="cell-sub">聚合视图</span></td>
+        <td><span class="stars">${starString(Math.min(5, Math.max(1, group.recent_reviews?.[0]?.star_rating || 3)))}</span></td>
+        <td>${group.recent_reviews?.[0] ? renderReviewMedia(mapReviewFromApi(group.recent_reviews[0])) : '<span class="cell-sub">无图 / 无视频</span>'}</td>
+        <td>${(group.recent_reviews || []).slice(0, 3).map((item) => `<span class="cell-sub">${item.review_title || "无标题"}：${item.review_content || ""}</span>`).join("")}</td>
+        <td>${group.recent_reviews?.[0]?.product_url ? `<a class="link-inline" href="${group.recent_reviews[0].product_url}" target="_blank" rel="noreferrer">产品链接</a>` : ""}</td>
+        <td><span class="chip neutral">聚合</span></td>
+        <td><span class="chip neutral">${(group.recent_reviews || []).map((item) => item.issue_category).filter(Boolean).slice(0, 2).join(" / ") || "待分类"}</span></td>
+        <td><span class="status neutral">产品聚合</span></td>
+        <td><span class="status ${(group.supplier_task_statuses || []).length ? "warn" : "neutral"}">${(group.supplier_task_statuses || []).join(" / ") || "未生成任务"}</span></td>
+        <td><span class="status neutral">查看子评论</span></td>
+      </tr>
+    `).join("");
+    return;
+  }
   body.innerHTML = reviews.map((review) => `
     <tr>
       <td>
@@ -395,8 +431,8 @@ function renderReviews() {
       <td><span class="chip neutral">${review.source}</span></td>
       <td><span class="chip ${review.issue === "其他" ? "neutral" : "warn"}">${review.issue}</span></td>
       <td><span class="status ${review.mood === "正面" ? "success" : review.mood === "中性" ? "warn" : "danger"}">${review.mood}</span></td>
-      <td><span class="status ${statusClass(review.feedback)}">${review.feedback}</span></td>
-      <td><span class="status ${statusClass(review.rectify)}">${review.rectify}</span></td>
+      <td><span class="status ${statusClass(review.feedback)}">${review.feedback}</span>${review.supplierTaskCode ? `<span class="cell-sub">任务 ${review.supplierTaskCode}</span>` : ""}</td>
+      <td><span class="status ${statusClass(review.rectify)}">${review.rectify}</span>${review.supplierTaskStatus ? `<span class="cell-sub">${review.supplierTaskStatus}${review.supplierTaskNotes ? ` · ${review.supplierTaskNotes}` : ""}</span>` : ""}</td>
     </tr>
   `).join("");
 }
@@ -552,4 +588,151 @@ document.addEventListener("DOMContentLoaded", () => {
   renderDetail();
   renderTasks();
   renderReports();
+  hydrateLiveData();
+  bindReviewViewSwitch();
 });
+
+function bindReviewViewSwitch() {
+  const buttons = document.querySelectorAll("[data-review-view]");
+  if (!buttons.length) return;
+  buttons.forEach((button) => {
+    button.addEventListener("click", async () => {
+      buttons.forEach((item) => item.classList.remove("active"));
+      button.classList.add("active");
+      reviewViewMode = button.getAttribute("data-review-view") || "timeline";
+      await hydrateReviews();
+      if (reviewViewMode === "negative") {
+        reviews = reviews.filter((item) => ("recent_reviews" in item ? true : item.stars <= 3));
+      }
+      renderReviews();
+    });
+  });
+}
+
+async function hydrateLiveData() {
+  const page = document.body.dataset.page;
+  if (page === "products") await hydrateProducts();
+  if (page === "reviews") await hydrateReviews();
+  if (page === "comparison") await hydrateComparison();
+}
+
+async function fetchJson(path) {
+  const response = await fetch(`${API_BASE}${path}`);
+  if (!response.ok) throw new Error(`Failed to fetch ${path}`);
+  return response.json();
+}
+
+async function hydrateProducts() {
+  try {
+    const data = await fetchJson("/products?limit=100");
+    if (!data.items?.length) return;
+    products = data.items.map(mapProductFromApi);
+    renderProducts();
+  } catch (error) {
+    console.warn("Products API unavailable, fallback to mock data", error);
+  }
+}
+
+async function hydrateReviews() {
+  try {
+    const mode = reviewViewMode === "negative" ? "timeline" : reviewViewMode;
+    const data = await fetchJson(`/reviews?limit=100&view_mode=${mode}`);
+    if (!data.items?.length) return;
+    reviews = mode === "product" ? data.items : data.items.map(mapReviewFromApi);
+    if (reviewViewMode === "negative") {
+      reviews = reviews.filter((item) => item.stars <= 3);
+    }
+    renderReviews();
+  } catch (error) {
+    console.warn("Reviews API unavailable, fallback to mock data", error);
+  }
+}
+
+async function hydrateComparison() {
+  try {
+    const data = await fetchJson("/products/compare?parent_asin=B0DXSEAT01&limit=20");
+    if (!data.items?.length) return;
+    comparisonData = data.items.map(mapComparisonFromApi);
+    renderComparison();
+  } catch (error) {
+    console.warn("Comparison API unavailable, fallback to mock data", error);
+  }
+}
+
+function mapProductFromApi(item) {
+  return {
+    tone: "tone-1",
+    name: item.title || "未命名产品",
+    asin: item.asin || "-",
+    parentAsin: item.parent_asin || "-",
+    sku: item.sku || item.department_item_no || "-",
+    store: item.store_name || "未识别店铺",
+    site: item.site_code || "-",
+    platform: item.platform || "-",
+    category: item.category_name || item.category_path || "-",
+    price: item.price_amount ? `${item.price_currency || ""}${item.price_amount}` : "-",
+    sales: item.monthly_sales ?? "-",
+    salesAmount: item.monthly_revenue ? `${item.price_currency || ""}${item.monthly_revenue}` : "-",
+    reviews: item.review_count ?? "-",
+    newReviews: "-",
+    rating: item.rating ?? "-",
+    imageReviews: "-",
+    variantCount: item.variation_count ?? "-",
+    keywords: [item.keyword_total, item.keyword_organic, item.keyword_ads].filter((value) => value !== null && value !== undefined).join(" / ") || "-",
+    bsr: [item.bsr_main, item.bsr_sub].filter((value) => value !== null && value !== undefined).join(" / ") || "-",
+    dimensions: [item.size_text, item.weight_text].filter(Boolean).join(" / ") || "-",
+    fulfillment: item.fulfillment_type || "-",
+    sellerCount: item.seller_count ?? "-",
+    buybox: item.buybox_seller ? "正常" : "待补",
+    buyboxSeller: item.buybox_seller || "-",
+    adFlags: "-",
+    contentFlags: "-",
+    negative: "-",
+    issue: "-",
+    supplier: item.supplier_name || item.supplier_factory || "-",
+    launchDate: item.launch_date || "-",
+    rectify: item.status || "待补",
+  };
+}
+
+function mapReviewFromApi(item) {
+  return {
+    tone: "tone-1",
+    id: item.review_external_id || `RV-${item.id || "N/A"}`,
+    title: item.review_title || "无标题评论",
+    product: item.product_title || "未命名产品",
+    store: item.store_name || "未识别店铺",
+    site: item.site_code || "-",
+    platform: item.platform || "-",
+    stars: item.star_rating || 3,
+    hasImage: Boolean(item.has_images || item.review_images),
+    mediaType: String(item.review_images || "").toLowerCase().includes("video") ? "video" : (item.has_images ? "image" : "none"),
+    reviewUrl: item.review_url || "#",
+    productUrl: item.product_url || "#",
+    content: item.review_content || "暂无评论内容",
+    issue: item.issue_category || "待分类",
+    mood: item.sentiment || (item.is_negative_review ? "负面" : "中性"),
+    feedback: item.feedback_to_supplier ? "已反馈" : "未反馈",
+    rectify: item.rectification_status || "待反馈",
+    source: item.source_type || "导入",
+    asin: item.asin || "-",
+    supplierTaskCode: item.supplier_task_code || "",
+    supplierTaskStatus: item.supplier_task_status || "",
+    supplierTaskNotes: item.supplier_task_notes || "",
+  };
+}
+
+function mapComparisonFromApi(item) {
+  return {
+    store: item.store_name || "未识别店铺",
+    site: item.site_code || "-",
+    sales: item.recent_sales ?? "-",
+    salesAmount: item.recent_revenue ? `${item.price_currency || ""}${item.recent_revenue}` : "-",
+    score: item.rating ?? "-",
+    negative: item.negative_ratio ?? 0,
+    volume: item.review_total ?? item.review_count ?? 0,
+    imageReviews: item.image_review_total ?? "-",
+    top3: item.supplier_name || item.category_name || "待补评论问题",
+    action: item.buybox_seller ? `关注 ${item.buybox_seller}` : "待生成建议动作",
+  };
+}

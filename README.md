@@ -19,6 +19,7 @@
 - `GET /api/stores/import-preview/internal`
 - `POST /api/stores/import/internal`
 - `GET /api/products`
+- `GET /api/products/compare`
 - `GET /api/products/import-preview/internal`
 - `GET /api/products/import-preview/sellersprite`
 - `POST /api/products/import/internal`
@@ -46,6 +47,22 @@
 - 先人工导入评论，再由系统提示哪些行不完整
 - 判断某次 Excel 导入是否足够干净，可以放心用于报表
 - 为后续前端做“导入记录”和“数据健康度”页面提供接口基础
+
+## 新增的真实查询能力
+
+- 产品总表支持按 `平台 / 站点 / 店铺 / 关键词 / 多 ASIN / 多 SKU` 查询
+- 评论总表支持两种视图：
+  - `timeline`：全站评论按时间倒序
+  - `product`：按产品聚合后查看最近评论
+- 评论接口会附带供应商任务摘要字段：
+  - `supplier_task_code`
+  - `supplier_task_status`
+  - `supplier_task_priority`
+  - `supplier_name`
+- 同款对比接口支持：
+  - `Parent ASIN`
+  - 多 `ASIN`
+  - 多 `SKU`
 
 ## 本地启动
 

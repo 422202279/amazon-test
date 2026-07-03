@@ -1,10 +1,12 @@
 from fastapi import APIRouter
 
 from fastapi import Depends
+from sqlalchemy import case, func, or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.product import Product
+from app.models.review import Review
 from app.serializers import to_dict
 from app.services.data_quality import validate_product_rows
 from app.services.import_jobs import create_import_job
@@ -14,14 +16,134 @@ from app.services.product_importer import (
     preview_internal_store_products,
     preview_sellersprite_products,
 )
+from app.services.query_helpers import split_identifier_terms
 
 router = APIRouter(prefix="/products", tags=["products"])
 
 
 @router.get("")
-def list_products(limit: int = 100, db: Session = Depends(get_db)):
-    items = db.query(Product).order_by(Product.updated_at.desc()).limit(limit).all()
-    return {"items": [to_dict(item) for item in items]}
+def list_products(
+    limit: int = 100,
+    offset: int = 0,
+    q: str | None = None,
+    identifiers: str | None = None,
+    platform: str | None = None,
+    site_code: str | None = None,
+    store_name: str | None = None,
+    db: Session = Depends(get_db),
+):
+    query = db.query(Product)
+    if platform:
+        query = query.filter(Product.platform == platform)
+    if site_code:
+        query = query.filter(Product.site_code == site_code)
+    if store_name:
+        query = query.filter(Product.store_name == store_name)
+    terms = split_identifier_terms(identifiers)
+    if terms:
+        query = query.filter(
+            or_(
+                Product.asin.in_(terms),
+                Product.parent_asin.in_(terms),
+                Product.sku.in_(terms),
+                Product.department_item_no.in_(terms),
+            )
+        )
+    if q:
+        like = f"%{q}%"
+        query = query.filter(
+            or_(
+                Product.title.ilike(like),
+                Product.brand.ilike(like),
+                Product.asin.ilike(like),
+                Product.parent_asin.ilike(like),
+                Product.sku.ilike(like),
+                Product.department_item_no.ilike(like),
+            )
+        )
+    total = query.count()
+    items = query.order_by(Product.updated_at.desc(), Product.id.desc()).offset(offset).limit(limit).all()
+    return {"items": [to_dict(item) for item in items], "total": total, "offset": offset, "limit": limit}
+
+
+@router.get("/compare")
+def compare_products(
+    parent_asin: str | None = None,
+    asins: str | None = None,
+    skus: str | None = None,
+    identifiers: str | None = None,
+    platform: str | None = None,
+    site_code: str | None = None,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+):
+    query = db.query(Product)
+    if platform:
+        query = query.filter(Product.platform == platform)
+    if site_code:
+        query = query.filter(Product.site_code == site_code)
+
+    asin_terms = split_identifier_terms(asins)
+    sku_terms = split_identifier_terms(skus)
+    mixed_terms = split_identifier_terms(identifiers)
+    filters = []
+    if parent_asin:
+        filters.append(Product.parent_asin == parent_asin)
+    if asin_terms:
+        filters.append(Product.asin.in_(asin_terms))
+    if sku_terms:
+        filters.append(Product.sku.in_(sku_terms))
+    if mixed_terms:
+        filters.append(
+            or_(
+                Product.parent_asin.in_(mixed_terms),
+                Product.asin.in_(mixed_terms),
+                Product.sku.in_(mixed_terms),
+                Product.department_item_no.in_(mixed_terms),
+            )
+        )
+    if filters:
+        query = query.filter(or_(*filters))
+
+    items = query.order_by(Product.store_name.asc(), Product.site_code.asc(), Product.id.desc()).limit(limit).all()
+    asin_list = [item.asin for item in items if item.asin]
+    review_stats = {
+        row.asin: row
+        for row in (
+            db.query(
+                Review.asin.label("asin"),
+                func.count(Review.id).label("review_total"),
+                func.sum(case((Review.is_negative_review.is_(True), 1), else_=0)).label("negative_total"),
+                func.sum(case((Review.has_images.is_(True), 1), else_=0)).label("image_total"),
+            )
+            .filter(Review.asin.in_(asin_list) if asin_list else False)
+            .group_by(Review.asin)
+            .all()
+        )
+    }
+
+    payload = []
+    for item in items:
+        stats = review_stats.get(item.asin)
+        negative_total = int(stats.negative_total or 0) if stats else 0
+        review_total = int(stats.review_total or 0) if stats else (item.review_count or 0)
+        payload.append(
+            {
+                **to_dict(item),
+                "recent_sales": item.monthly_sales,
+                "recent_revenue": item.monthly_revenue,
+                "review_total": review_total,
+                "negative_review_total": negative_total,
+                "negative_ratio": round((negative_total / review_total) * 100, 2) if review_total else None,
+                "image_review_total": int(stats.image_total or 0) if stats else None,
+            }
+        )
+    return {
+        "items": payload,
+        "matched_count": len(payload),
+        "supported_periods": ["all", "30d", "60d", "90d", "180d"],
+        "notes": "当前销量字段以导入源的近30天快照为主，多周期销量需结合历史表进一步计算。",
+    }
 
 
 @router.get("/import-preview/internal")
