@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     upload_dir: Path = Path("data/uploads")
     export_dir: Path = Path("data/exports")
     sample_data_dir: Path = Path("../sample-data")
+    default_schedule_times: str = "06:00"
+    max_schedule_times: int = 3
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

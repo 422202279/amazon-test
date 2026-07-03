@@ -105,6 +105,40 @@
             <a class="button ghost" href="./templates/supplier-task-template.xlsx">整改任务模板</a>
           </div>
         </section>
+
+        <section class="two-col">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>定时任务管理</h2>
+                <p>最低配云服务器建议轻量运行，默认每天早上 06:00 触发一次</p>
+              </div>
+              <span class="chip success">低频调度</span>
+            </div>
+            <div class="setting-list">
+              <div><strong>默认任务</strong><span>06:00 自动更新产品、趋势、报告缓存</span></div>
+              <div><strong>可自定义时间点</strong><span>最多 3 个，建议只加重点时段，不做高频轮询</span></div>
+              <div><strong>手动更新</strong><span>支持按产品 / 评论 / 对比缓存单独触发</span></div>
+              <div><strong>服务器建议</strong><span>2C2G 最低配只适合低频任务，不建议高频抓取</span></div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>韩国站人工采集策略</h2>
+                <p>Coupang / Naver 在没有卖家 API 账号前，先作为手动采集源处理</p>
+              </div>
+              <span class="chip warn">手动优先</span>
+            </div>
+            <div class="setting-list">
+              <div><strong>数据来源</strong><span>人工采集 / 手动导入 / 页面校验</span></div>
+              <div><strong>推荐频次</strong><span>每周 1~2 次，或新品 / 重点品单独更新</span></div>
+              <div><strong>视频证据</strong><span>只保留封面图和原评论链接，不保存原视频</span></div>
+              <div><strong>主档优先级</strong><span>先把产品标题、链接、价格、评分、评论数录入完整</span></div>
+            </div>
+          </div>
+        </section>
       </main>
     </div>
     <script src="./app.js"></script>
