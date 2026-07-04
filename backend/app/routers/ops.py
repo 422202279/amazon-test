@@ -4,11 +4,14 @@ from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
 from app.models.import_job import ImportJob
+from app.models.product import Product
 from app.models.user_account import UserAccount
 from app.serializers import to_dict
 from app.security import get_current_user
@@ -23,8 +26,17 @@ from app.services.product_importer import (
     preview_sellersprite_sales_history,
     preview_sellersprite_products,
 )
+from app.services.source_capture import preview_product_from_url
 
 router = APIRouter(prefix="/ops", tags=["ops"])
+
+
+class UrlProductCapturePayload(BaseModel):
+    url: str
+    store_name: str | None = None
+    supplier_name: str | None = None
+    supplier_factory: str | None = None
+    status: str | None = "正常监控"
 
 
 def _sqlite_db_path() -> Path | None:
@@ -202,6 +214,57 @@ def bootstrap_local_data(
     result["sales_history"] = import_sellersprite_sales_history(db, sales_path, 200)
     db.commit()
     return result
+
+
+@router.post("/url-product-preview")
+def url_product_preview(payload: UrlProductCapturePayload):
+    item = preview_product_from_url(payload.url)
+    if payload.store_name:
+        item["store_name"] = payload.store_name
+    if payload.supplier_name:
+        item["supplier_name"] = payload.supplier_name
+    if payload.supplier_factory:
+        item["supplier_factory"] = payload.supplier_factory
+    return {"item": item}
+
+
+@router.post("/url-product-import")
+def url_product_import(
+    payload: UrlProductCapturePayload,
+    db: Session = Depends(get_db),
+    _: UserAccount = Depends(get_current_user),
+):
+    item = preview_product_from_url(payload.url)
+    item["store_name"] = payload.store_name or item.get("store_name")
+    item["supplier_name"] = payload.supplier_name or item.get("supplier_name")
+    item["supplier_factory"] = payload.supplier_factory or item.get("supplier_factory")
+    item["status"] = payload.status or "正常监控"
+
+    filters = []
+    if item.get("asin"):
+        filters.append(Product.asin == item["asin"])
+    if item.get("product_url"):
+        filters.append(Product.product_url == item["product_url"])
+    existing = (
+        db.query(Product)
+        .filter(Product.platform == item["platform"], Product.site_code == item["site_code"])
+        .filter(or_(*filters) if filters else Product.id == -1)
+        .one_or_none()
+    )
+
+    if existing:
+        for key, value in item.items():
+            if key in Product.__table__.columns.keys() and value not in (None, ""):
+                setattr(existing, key, value)
+        db.commit()
+        db.refresh(existing)
+        return {"action": "updated", "item": to_dict(existing)}
+
+    product = Product(**{key: value for key, value in item.items() if key in Product.__table__.columns.keys()})
+    db.add(product)
+    db.commit()
+    db.refresh(product)
+    return {"action": "created", "item": to_dict(product)}
 
 
 @router.get("/backups")

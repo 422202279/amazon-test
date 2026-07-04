@@ -1089,6 +1089,7 @@ function bindCrudActions() {
   bindTaskCreate();
   bindAccountCreate();
   bindBootstrapLocalData();
+  bindUrlCaptureActions();
   bindGenerateTasks();
   bindLogout();
 }
@@ -1389,6 +1390,79 @@ function bindBootstrapLocalData() {
     } finally {
       button.disabled = false;
       button.textContent = "导入本地真实数据";
+    }
+  });
+}
+
+function buildUrlCapturePayload() {
+  const url = document.getElementById("url-capture-input")?.value?.trim();
+  if (!url) {
+    alert("请先粘贴产品链接");
+    return null;
+  }
+  return {
+    url,
+    store_name: document.getElementById("url-capture-store")?.value?.trim() || null,
+    supplier_name: document.getElementById("url-capture-supplier")?.value?.trim() || null,
+    supplier_factory: document.getElementById("url-capture-factory")?.value?.trim() || null,
+  };
+}
+
+function renderUrlCaptureResult(item) {
+  const table = document.getElementById("url-capture-table");
+  if (!table || !item) return;
+  const price = item.price_amount ? `${item.price_currency || ""} ${item.price_amount}`.trim() : "-";
+  table.innerHTML = `
+    <tr>
+      <td>${escapeHtml(item.platform || "-")}</td>
+      <td>${escapeHtml(localizeSite(item.site_code) || item.site_code || "-")}</td>
+      <td><div class="cell-main">${escapeHtml(item.title || "-")}</div><div class="cell-sub"><a href="${escapeHtml(item.product_url || "#")}" target="_blank" rel="noreferrer">打开商品页</a></div></td>
+      <td>${escapeHtml(item.asin || item.sku || "-")}</td>
+      <td>${escapeHtml(price)}</td>
+      <td>${escapeHtml(item.rating ?? "-")}</td>
+      <td>${escapeHtml(item.review_count ?? "-")}</td>
+      <td><span class="status ${statusClass(item.capture_status === "ok" ? "正常监控" : "待补数据")}">${escapeHtml(item.capture_status || "-")}</span></td>
+      <td>${escapeHtml(item.capture_note || "-")}</td>
+    </tr>
+  `;
+}
+
+function bindUrlCaptureActions() {
+  const previewButton = document.getElementById("url-capture-preview-button");
+  const importButton = document.getElementById("url-capture-import-button");
+  if (!previewButton || !importButton) return;
+
+  previewButton.addEventListener("click", async () => {
+    const payload = buildUrlCapturePayload();
+    if (!payload) return;
+    previewButton.disabled = true;
+    previewButton.textContent = "预览中...";
+    try {
+      const data = await fetchJson("/ops/url-product-preview", { method: "POST", body: JSON.stringify(payload) });
+      renderUrlCaptureResult(data.item);
+    } catch (error) {
+      alert(`链接预览失败：${error.message}`);
+    } finally {
+      previewButton.disabled = false;
+      previewButton.textContent = "预览链接数据";
+    }
+  });
+
+  importButton.addEventListener("click", async () => {
+    const payload = buildUrlCapturePayload();
+    if (!payload) return;
+    importButton.disabled = true;
+    importButton.textContent = "写入中...";
+    try {
+      const data = await fetchJson("/ops/url-product-import", { method: "POST", body: JSON.stringify(payload) });
+      renderUrlCaptureResult(data.item);
+      await hydrateProducts();
+      alert(data.action === "updated" ? "已更新到产品库" : "已写入产品库");
+    } catch (error) {
+      alert(`写入失败：${error.message}`);
+    } finally {
+      importButton.disabled = false;
+      importButton.textContent = "写入产品库";
     }
   });
 }

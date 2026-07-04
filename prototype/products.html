@@ -92,6 +92,55 @@
         <section class="panel">
           <div class="panel-head">
             <div>
+              <h2>链接采集实验台</h2>
+              <p>先预览单条真实商品链接，再一键写入产品库，适合补 Amazon / Coupang / Naver 样本</p>
+            </div>
+          </div>
+          <div class="filters dense">
+            <div class="filter-row filter-search wide">
+              <label>产品链接</label>
+              <input id="url-capture-input" type="text" placeholder="粘贴 Amazon / Coupang / Naver 商品链接" />
+            </div>
+            <div class="filter-row">
+              <label>店铺名</label>
+              <input id="url-capture-store" type="text" placeholder="可选" />
+            </div>
+            <div class="filter-row">
+              <label>供应商</label>
+              <input id="url-capture-supplier" type="text" placeholder="可选" />
+            </div>
+            <div class="filter-row">
+              <label>工厂</label>
+              <input id="url-capture-factory" type="text" placeholder="可选" />
+            </div>
+            <button class="button ghost" id="url-capture-preview-button">预览链接数据</button>
+            <button class="button primary" id="url-capture-import-button">写入产品库</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>平台</th>
+                  <th>站点</th>
+                  <th>标题</th>
+                  <th>ASIN / SKU</th>
+                  <th>价格</th>
+                  <th>评分</th>
+                  <th>评论数</th>
+                  <th>状态</th>
+                  <th>备注</th>
+                </tr>
+              </thead>
+              <tbody id="url-capture-table">
+                <tr><td colspan="9" class="muted">还没有预览真实链接数据。</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
               <h2>产品总表主视图</h2>
               <p>按真实产品数据结构扩展字段，并支持勾选展示字段，兼顾宽表与扫描效率</p>
             </div>
