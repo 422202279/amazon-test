@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from app.config import settings
+from app.config import settings, sqlite_path_from_url
 from app.database import get_db
 from app.models.import_job import ImportJob
 from app.models.product import Product
@@ -27,6 +27,7 @@ from app.services.product_importer import (
     preview_sellersprite_products,
 )
 from app.services.source_capture import preview_product_from_url
+from app.services.translation_helper import suggest_cn_title
 
 router = APIRouter(prefix="/ops", tags=["ops"])
 
@@ -40,9 +41,7 @@ class UrlProductCapturePayload(BaseModel):
 
 
 def _sqlite_db_path() -> Path | None:
-    if settings.database_url.startswith("sqlite:///./"):
-        return Path(settings.database_url.removeprefix("sqlite:///./"))
-    return None
+    return sqlite_path_from_url(settings.database_url)
 
 
 @router.get("/import-jobs")
@@ -239,6 +238,7 @@ def url_product_import(
     item["supplier_name"] = payload.supplier_name or item.get("supplier_name")
     item["supplier_factory"] = payload.supplier_factory or item.get("supplier_factory")
     item["status"] = payload.status or "正常监控"
+    item["localized_title"] = item.get("localized_title") or suggest_cn_title(item.get("title"))
 
     filters = []
     if item.get("asin"):

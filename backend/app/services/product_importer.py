@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.models.product import Product
 from app.models.product_metric import ProductMetricHistory
 from app.models.store import Store
+from app.services.translation_helper import suggest_cn_title
 
 
 @dataclass
@@ -491,6 +492,7 @@ def _apply_product_row(product: Product, row: dict) -> None:
     product.asin = row.get("asin")
     product.parent_asin = row.get("parent_asin")
     product.title = row.get("title") or product.title
+    product.localized_title = row.get("localized_title") or suggest_cn_title(row.get("title")) or product.localized_title
     product.brand = row.get("brand")
     product.category_path = row.get("category_path")
     product.category_name = row.get("category_name")

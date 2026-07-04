@@ -105,6 +105,15 @@ class SourceCaptureTests(unittest.TestCase):
         self.assertEqual(item["capture_status"], "error")
         self.assertIn("链接路径兜底", item["capture_note"])
 
+    @patch("app.services.source_capture.fetch_page_html")
+    def test_preview_product_from_url_falls_back_to_asin_when_slug_missing(self, mock_fetch):
+        mock_fetch.side_effect = RuntimeError("anti-bot")
+
+        item = preview_product_from_url("https://www.amazon.co.uk/dp/B0GSYGDM9Q")
+
+        self.assertEqual(item["title"], "ASIN B0GSYGDM9Q（待补标题）")
+        self.assertEqual(item["asin"], "B0GSYGDM9Q")
+
     @patch("app.routers.ops.preview_product_from_url")
     def test_url_product_preview_applies_manual_overrides(self, mock_preview):
         mock_preview.return_value = {"platform": "Amazon", "site_code": "US", "title": "Demo", "capture_status": "ok"}

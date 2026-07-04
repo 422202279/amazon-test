@@ -21,6 +21,7 @@ class Review(Base):
     star_rating: Mapped[int | None] = mapped_column(Integer, nullable=True)
     review_title: Mapped[str | None] = mapped_column(String(500), nullable=True)
     review_content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    review_summary_cn: Mapped[str | None] = mapped_column(Text, nullable=True)
     review_images: Mapped[str | None] = mapped_column(Text, nullable=True)
     reviewer_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     review_country: Mapped[str | None] = mapped_column(String(60), nullable=True)

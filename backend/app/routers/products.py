@@ -18,6 +18,7 @@ from app.services.product_importer import (
     preview_sellersprite_products,
 )
 from app.services.query_helpers import split_identifier_terms
+from app.services.translation_helper import suggest_cn_title
 
 router = APIRouter(prefix="/products", tags=["products"])
 
@@ -31,6 +32,7 @@ class ProductPayload(BaseModel):
     asin: str | None = None
     parent_asin: str | None = None
     title: str
+    localized_title: str | None = None
     brand: str | None = None
     category_path: str | None = None
     category_name: str | None = None
@@ -94,6 +96,7 @@ def list_products(
         query = query.filter(
             or_(
                 Product.title.ilike(like),
+                Product.localized_title.ilike(like),
                 Product.brand.ilike(like),
                 Product.asin.ilike(like),
                 Product.parent_asin.ilike(like),
@@ -112,7 +115,9 @@ def create_product(
     db: Session = Depends(get_db),
     _: UserAccount = Depends(get_current_user),
 ):
-    product = Product(**payload.model_dump())
+    data = payload.model_dump()
+    data["localized_title"] = data.get("localized_title") or suggest_cn_title(data.get("title"))
+    product = Product(**data)
     db.add(product)
     db.commit()
     db.refresh(product)
@@ -129,7 +134,9 @@ def update_product(
     product = db.query(Product).filter(Product.id == product_id).one_or_none()
     if not product:
         raise HTTPException(status_code=404, detail="产品不存在")
-    for key, value in payload.model_dump().items():
+    data = payload.model_dump()
+    data["localized_title"] = data.get("localized_title") or suggest_cn_title(data.get("title"))
+    for key, value in data.items():
         setattr(product, key, value)
     db.commit()
     db.refresh(product)

@@ -18,6 +18,7 @@ class Product(Base):
     asin: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)
     parent_asin: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)
     title: Mapped[str] = mapped_column(String(1000))
+    localized_title: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     brand: Mapped[str | None] = mapped_column(String(120), nullable=True)
     category_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
     category_name: Mapped[str | None] = mapped_column(String(200), nullable=True)

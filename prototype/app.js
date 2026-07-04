@@ -39,6 +39,7 @@ let products = [
 
 const productColumns = [
   { key: "product", label: "产品", locked: true, visible: true },
+  { key: "localizedTitle", label: "中文解释", visible: true },
   { key: "store", label: "店铺 / 站点", locked: true, visible: true },
   { key: "platform", label: "平台", visible: true },
   { key: "parentAsin", label: "父ASIN", visible: false },
@@ -481,6 +482,7 @@ function renderProductCell(item, key) {
         </div>
       </div>
     `,
+    localizedTitle: `<span class="cell-title">${item.localizedTitle || "-"}</span><span class="cell-sub">${item.localizedTitleAuto ? "自动翻译初稿，可人工修正" : "人工维护"}</span>`,
     store: `${item.store}<span class="cell-sub">${item.site}</span>`,
     platform: item.platform,
     parentAsin: item.parentAsin,
@@ -655,7 +657,7 @@ function renderReviews() {
       <td>${review.site}<span class="cell-sub">${review.platform}</span></td>
       <td><span class="stars">${starString(review.stars)}</span></td>
       <td>${renderReviewMedia(review)}</td>
-      <td>${review.content}</td>
+      <td><div class="cell-title">${review.content}</div>${review.summaryCn ? `<span class="cell-sub">中文摘要：${review.summaryCn}</span>` : ""}</td>
       <td>${renderExternalLink(review.productUrl, "产品链接")}<span class="cell-sub">${renderExternalLink(review.reviewUrl, "评论链接")}</span></td>
       <td><span class="chip neutral">${review.source}</span></td>
       <td><span class="chip ${review.issue === "其他" ? "neutral" : "warn"}">${review.issue}</span></td>
@@ -1066,6 +1068,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   restoreProductColumns();
+  applyInitialPageFilters();
   renderDashboard();
   renderStores();
   renderProducts();
@@ -1090,6 +1093,31 @@ document.addEventListener("DOMContentLoaded", async () => {
   bindManualRefresh();
   bindCrudActions();
 });
+
+function applyInitialPageFilters() {
+  const params = new URLSearchParams(window.location.search);
+  const page = document.body.dataset.page;
+  if (page === "products") {
+    const period = params.get("period");
+    if (period && document.getElementById("products-period-filter")) {
+      document.getElementById("products-period-filter").value = period;
+    }
+  }
+  if (page === "reviews") {
+    const period = params.get("period");
+    const media = params.get("media");
+    const view = params.get("view");
+    if (period && document.getElementById("reviews-period-filter")) {
+      document.getElementById("reviews-period-filter").value = period;
+    }
+    if (media && document.getElementById("reviews-media-filter")) {
+      document.getElementById("reviews-media-filter").value = media;
+    }
+    if (view) {
+      reviewViewMode = view;
+    }
+  }
+}
 
 function bindLoginForm() {
   const button = document.getElementById("login-submit");
@@ -1769,6 +1797,7 @@ function collectEditorFormData(fields) {
 function productEditorFields() {
   return [
     { key: "title", label: "产品标题", full: true },
+    { key: "localized_title", label: "中文解释", full: true },
     { key: "platform", label: "平台", type: "select", options: platformOptions() },
     { key: "site_code", label: "站点", type: "select", options: siteOptions() },
     { key: "store_name", label: "店铺名" },
@@ -1801,6 +1830,7 @@ function productEditorFields() {
 function reviewEditorFields() {
   return [
     { key: "review_title", label: "评论标题", full: true },
+    { key: "review_summary_cn", label: "中文摘要", type: "textarea", full: true },
     { key: "platform", label: "平台", type: "select", options: platformOptions() },
     { key: "site_code", label: "站点", type: "select", options: siteOptions() },
     { key: "store_name", label: "店铺名" },
@@ -1870,6 +1900,7 @@ function openReviewEditor(source = null) {
 function buildProductEditorValues(source = null) {
   return source ? {
     title: source.name || "",
+    localized_title: source.localizedTitle || "",
     platform: source.platform || "Amazon",
     site_code: reverseLocalizeSite(source.site) || "US",
     store_name: source.store || "",
@@ -1898,6 +1929,7 @@ function buildProductEditorValues(source = null) {
     status: source.rectify || "正常监控",
   } : {
     title: "",
+    localized_title: "",
     platform: "Amazon",
     site_code: "US",
     store_name: "",
@@ -1930,6 +1962,7 @@ function buildProductEditorValues(source = null) {
 function buildReviewEditorValues(source = null) {
   return source ? {
     review_title: source.title || "",
+    review_summary_cn: source.summaryCn || "",
     platform: source.platform || "Amazon",
     site_code: reverseLocalizeSite(source.site) || "US",
     store_name: source.store || "",
@@ -1949,6 +1982,7 @@ function buildReviewEditorValues(source = null) {
     review_content: source.content || "",
   } : {
     review_title: "",
+    review_summary_cn: "",
     platform: "Amazon",
     site_code: "US",
     store_name: "",
@@ -1979,6 +2013,7 @@ function productPayloadFromForm(data) {
     asin: data.asin || "",
     parent_asin: data.parent_asin || "",
     title: data.title || "",
+    localized_title: data.localized_title || "",
     brand: data.brand || "",
     category_path: "",
     category_name: data.category_name || "",
@@ -2024,6 +2059,7 @@ function reviewPayloadFromForm(data) {
     star_rating: data.star_rating ? Number(data.star_rating) : null,
     review_title: data.review_title || "",
     review_content: data.review_content || "",
+    review_summary_cn: data.review_summary_cn || "",
     review_images: data.review_images || "",
     reviewer_name: "Local User",
     review_country: data.site_code || "US",
@@ -2425,6 +2461,8 @@ function mapProductFromApi(item) {
     recordId: item.id,
     tone: "tone-1",
     name: item.title || "未命名产品",
+    localizedTitle: item.localized_title || "",
+    localizedTitleAuto: Boolean(item.localized_title),
     asin: item.asin || "-",
     parentAsin: item.parent_asin || "-",
     sku: item.sku || item.department_item_no || "-",
@@ -2485,6 +2523,7 @@ function mapReviewFromApi(item) {
     tone: "tone-1",
     id: item.review_external_id || `RV-${item.id || "N/A"}`,
     title: item.review_title || "无标题评论",
+    summaryCn: item.review_summary_cn || "",
     product: item.product_title || "未命名产品",
     store: item.store_name || "未识别店铺",
     site: localizeSite(item.site_code),

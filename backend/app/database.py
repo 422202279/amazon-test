@@ -3,7 +3,7 @@ from pathlib import Path
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-from app.config import settings
+from app.config import settings, sqlite_path_from_url
 
 
 class Base(DeclarativeBase):
@@ -11,9 +11,9 @@ class Base(DeclarativeBase):
 
 
 def _ensure_sqlite_parent() -> None:
-    if settings.database_url.startswith("sqlite:///./"):
-        relative_path = settings.database_url.removeprefix("sqlite:///./")
-        Path(relative_path).parent.mkdir(parents=True, exist_ok=True)
+    sqlite_path = sqlite_path_from_url(settings.database_url)
+    if sqlite_path:
+        Path(sqlite_path).parent.mkdir(parents=True, exist_ok=True)
 
 
 _ensure_sqlite_parent()
@@ -35,6 +35,12 @@ def ensure_lightweight_migrations() -> None:
             "stores_json": "TEXT",
             "status": "VARCHAR(40) DEFAULT '启用'",
             "last_login_at": "DATETIME",
+        },
+        "products": {
+            "localized_title": "VARCHAR(1000)",
+        },
+        "reviews": {
+            "review_summary_cn": "TEXT",
         }
     }
     with engine.begin() as connection:

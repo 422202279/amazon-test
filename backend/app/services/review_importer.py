@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.review import Review
+from app.services.translation_helper import suggest_cn_summary
 
 
 @dataclass
@@ -117,6 +118,7 @@ def _apply_review_row(review: Review, row: dict) -> None:
     review.star_rating = row.get("star_rating")
     review.review_title = row.get("review_title")
     review.review_content = row.get("review_content")
+    review.review_summary_cn = row.get("review_summary_cn") or suggest_cn_summary(row.get("review_content"))
     review.review_images = row.get("review_images")
     review.reviewer_name = row.get("reviewer_name")
     review.review_country = row.get("review_country")

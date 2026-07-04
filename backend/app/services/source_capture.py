@@ -29,7 +29,7 @@ def fetch_page_html(url: str, timeout: int = 15) -> str:
 
 def preview_product_from_url(url: str, html: str | None = None) -> dict:
     platform, site_code = detect_platform_and_site(url)
-    url_title = extract_title_from_url(url)
+    url_title = build_fallback_title(url, platform)
     try:
         page_html = html if html is not None else fetch_page_html(url)
     except Exception as exc:
@@ -231,6 +231,26 @@ def extract_title_from_url(url: str) -> str | None:
     if not words:
         return None
     return normalize_space(" ".join(words))
+
+
+def build_fallback_title(url: str, platform: str) -> str | None:
+    slug_title = extract_title_from_url(url)
+    if slug_title:
+        return slug_title
+    if platform == "Amazon":
+        asin = extract_asin(url, "")
+        if asin:
+            return f"ASIN {asin}（待补标题）"
+    path = urlparse(url).path or ""
+    if platform == "Coupang":
+        match = re.search(r"/products/(\d+)", path, re.I)
+        if match:
+            return f"Coupang 商品 {match.group(1)}（待补标题）"
+    if platform == "Naver":
+        match = re.search(r"/products/(\d+)", path, re.I)
+        if match:
+            return f"Naver 商品 {match.group(1)}（待补标题）"
+    return None
 
 
 def extract_price(html: str, platform: str) -> tuple[float | None, str | None]:

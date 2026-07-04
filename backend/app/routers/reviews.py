@@ -15,6 +15,7 @@ from app.services.data_quality import validate_review_rows
 from app.services.import_jobs import create_import_job
 from app.services.query_helpers import split_identifier_terms
 from app.services.review_importer import import_reviews_from_workbook, preview_reviews_from_workbook
+from app.services.translation_helper import suggest_cn_summary
 
 router = APIRouter(prefix="/reviews", tags=["reviews"])
 
@@ -31,6 +32,7 @@ class ReviewPayload(BaseModel):
     star_rating: int | None = None
     review_title: str | None = None
     review_content: str | None = None
+    review_summary_cn: str | None = None
     review_images: str | None = None
     reviewer_name: str | None = None
     review_country: str | None = None
@@ -74,6 +76,7 @@ def list_reviews(
         query = query.filter(
             or_(
                 Review.review_content.ilike(like),
+                Review.review_summary_cn.ilike(like),
                 Review.review_title.ilike(like),
                 Review.product_title.ilike(like),
                 Review.asin.ilike(like),
@@ -146,6 +149,7 @@ def create_review(
     _: UserAccount = Depends(get_current_user),
 ):
     data = payload.model_dump()
+    data["review_summary_cn"] = data.get("review_summary_cn") or suggest_cn_summary(data.get("review_content"))
     data["reviewed_at"] = _parse_datetime(data.get("reviewed_at"))
     review = Review(**data)
     db.add(review)
@@ -165,6 +169,7 @@ def update_review(
     if not review:
         raise HTTPException(status_code=404, detail="评论不存在")
     data = payload.model_dump()
+    data["review_summary_cn"] = data.get("review_summary_cn") or suggest_cn_summary(data.get("review_content"))
     data["reviewed_at"] = _parse_datetime(data.get("reviewed_at"))
     for key, value in data.items():
         setattr(review, key, value)
