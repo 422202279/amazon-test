@@ -562,7 +562,7 @@ function renderProductCell(item, key) {
   const cells = {
     product: `
       <div class="product-cell">
-        <span class="thumb ${item.tone}"></span>
+        ${item.imageUrl ? `<span class="thumb media-thumb product-image-thumb" style="background-image:url('${escapeHtml(item.imageUrl)}'); background-size:cover; background-position:center;"></span>` : `<span class="thumb ${item.tone}"></span>`}
         <div>
           <span class="cell-title">${item.productUrl ? `<a class="link-inline" href="${item.productUrl}" target="_blank" rel="noreferrer">${item.name}</a>` : item.name}</span>
           <span class="cell-sub">${item.asin} · ${item.sku}</span>
@@ -781,7 +781,7 @@ function renderReviews() {
       <td><span class="chip neutral">${review.source}</span></td>
       <td><span class="chip ${review.issue === "其他" ? "neutral" : "warn"}">${review.issue}</span></td>
       <td><span class="status ${review.mood === "正面" ? "success" : review.mood === "中性" ? "warn" : "danger"}">${review.mood}</span></td>
-      <td><span class="status ${statusClass(review.feedback)}">${review.feedback}</span>${review.supplierTaskCode ? `<span class="cell-sub">任务 ${review.supplierTaskCode}</span>` : ""}</td>
+      <td><span class="status ${statusClass(review.feedback)}">${review.feedback}</span>${review.supplierTaskCode ? `<span class="cell-sub"><a class="link-inline" href="./supplier-tasks.html?q=${encodeURIComponent(review.supplierTaskCode)}">任务 ${review.supplierTaskCode}</a></span>` : ""}</td>
       <td><span class="status ${statusClass(review.rectify)}">${review.rectify}</span>${review.supplierTaskStatus ? `<span class="cell-sub">${review.supplierTaskStatus}${review.supplierTaskNotes ? ` · ${review.supplierTaskNotes}` : ""}</span>` : ""}</td>
       <td>${renderRowActions("review", review.recordId)}</td>
     </tr>
@@ -889,8 +889,8 @@ function renderComparison() {
       <span class="chip ${index === 2 ? "danger" : "neutral"}">${item.store}</span>
       <h3>${item.site}站</h3>
       <div class="numbers">
-        <div><span class="cell-sub">近30天销量</span><strong>${item.sales}</strong></div>
-        <div><span class="cell-sub">近30天销售额</span><strong>${item.salesAmount}</strong></div>
+        <div><span class="cell-sub">${periodLabel}销量</span><strong>${item.sales}</strong></div>
+        <div><span class="cell-sub">${periodLabel}销售额</span><strong>${item.salesAmount}</strong></div>
         <div><span class="cell-sub">评分</span><strong>${item.score}</strong></div>
         <div><span class="cell-sub">差评占比</span><strong>${item.negative}%</strong></div>
         <div><span class="cell-sub">评论总数</span><strong>${item.volume}</strong></div>
@@ -1016,6 +1016,7 @@ function renderDetail() {
   const detailProduct = getCurrentDetailProduct();
   const openLinkButton = document.getElementById("detail-open-product-link");
   const compareButton = document.getElementById("detail-create-comparison");
+  const reviewsLink = document.querySelector('.panel-head a[href="./reviews.html"]');
   if (detailProduct && document.body.dataset.page === "product-detail") {
     const titleNode = document.querySelector(".topbar h1");
     const descNode = document.querySelector(".topbar p");
@@ -1033,6 +1034,9 @@ function renderDetail() {
       if (metrics[4]) metrics[4].textContent = detailProduct.parentAsin;
       if (metrics[5]) metrics[5].textContent = detailProduct.keywords;
     }
+  }
+  if (reviewsLink && detailProduct?.asin) {
+    reviewsLink.setAttribute("href", `./reviews.html?q=${encodeURIComponent(detailProduct.asin)}`);
   }
   if (openLinkButton) {
     openLinkButton.onclick = () => {
@@ -1055,7 +1059,10 @@ function renderDetail() {
       window.location.href = `./comparison.html?${params.toString()}`;
     };
   }
-  feed.innerHTML = reviews.slice(0, 4).map((review) => `
+  const scopedReviews = reviews
+    .filter((review) => review.asin === detailProduct?.asin)
+    .slice(0, 6);
+  feed.innerHTML = (scopedReviews.length ? scopedReviews : reviews.slice(0, 4)).map((review) => `
     <article class="review-card">
       <div class="review-card-head">
         <span class="stars">${starString(review.stars)}</span>
@@ -1103,10 +1110,10 @@ function renderTasks() {
   table.innerHTML = tasks.map((task) => `
     <tr>
       <td>${task.id}</td>
-      <td>${task.product}</td>
+      <td><span class="cell-title">${task.product}</span><span class="cell-sub">${task.asin || "-"}</span></td>
       <td>${task.supplier}</td>
       <td>${task.issue}</td>
-      <td>${task.evidence}</td>
+      <td><span class="cell-title">${task.evidence}</span><span class="cell-sub">${task.asin ? `<a class="link-inline" href="./reviews.html?q=${encodeURIComponent(task.asin)}&view=negative">查看关联评论</a>` : "暂无关联评论"}</span></td>
       <td>${task.suggestedAction}</td>
       <td>${task.actualRectification}</td>
       <td><span class="status ${statusClass(task.priority)}">${task.priority}</span></td>
@@ -1383,6 +1390,30 @@ function applyInitialPageFilters() {
       document.getElementById("comparison-period").value = period;
     }
   }
+  if (page === "reports") {
+    const type = params.get("type");
+    const title = params.get("title");
+    const scope = params.get("scope");
+    const period = params.get("period");
+    if (type && document.getElementById("report-builder-type")) {
+      document.getElementById("report-builder-type").value = type;
+    }
+    if (title && document.getElementById("report-builder-title")) {
+      document.getElementById("report-builder-title").value = title;
+    }
+    if (scope && document.getElementById("report-builder-scope")) {
+      document.getElementById("report-builder-scope").value = scope;
+    }
+    if (period && document.getElementById("report-builder-period")) {
+      document.getElementById("report-builder-period").value = period;
+    }
+  }
+  if (page === "supplier-tasks") {
+    const q = params.get("q");
+    if (q && document.getElementById("tasks-search-input")) {
+      document.getElementById("tasks-search-input").value = q;
+    }
+  }
 }
 
 function bindLoginForm() {
@@ -1419,6 +1450,7 @@ function bindCrudActions() {
   bindReportActions();
   bindLogout();
   bindProductActions();
+  bindTaskFilters();
 }
 
 function bindDashboardWidgets() {
@@ -1813,7 +1845,10 @@ async function hydrateComparison() {
 
 async function hydrateTasks() {
   try {
-    const data = await fetchJson("/supplier-tasks?limit=100");
+    const params = new URLSearchParams({ limit: "100" });
+    const search = document.getElementById("tasks-search-input")?.value?.trim() || "";
+    if (search) params.set("q", search);
+    const data = await fetchJson(`/supplier-tasks?${params.toString()}`);
     if (!data.items?.length) return;
     tasks.splice(0, tasks.length, ...data.items.map(mapTaskFromApi));
     renderTasks();
@@ -1821,6 +1856,14 @@ async function hydrateTasks() {
   } catch (error) {
     console.warn("Supplier tasks API unavailable, fallback to mock data", error);
   }
+}
+
+function bindTaskFilters() {
+  const button = document.getElementById("tasks-apply-button");
+  if (!button) return;
+  button.addEventListener("click", async () => {
+    await hydrateTasks();
+  });
 }
 
 async function hydrateReports() {
@@ -1970,7 +2013,7 @@ function renderUrlCaptureResult(item) {
     <tr>
       <td>${escapeHtml(item.platform || "-")}</td>
       <td>${escapeHtml(localizeSite(item.site_code) || item.site_code || "-")}</td>
-      <td><div class="cell-main">${escapeHtml(item.title || "-")}</div><div class="cell-sub"><a href="${escapeHtml(item.product_url || "#")}" target="_blank" rel="noreferrer">打开商品页</a></div></td>
+      <td><div class="product-cell">${item.image_url ? `<span class="thumb media-thumb product-image-thumb" style="background-image:url('${escapeHtml(item.image_url)}'); background-size:cover; background-position:center;"></span>` : `<span class="thumb tone-1"></span>`}<div><div class="cell-main">${escapeHtml(item.title || "-")}</div><div class="cell-sub"><a href="${escapeHtml(item.product_url || "#")}" target="_blank" rel="noreferrer">打开商品页</a></div></div></div></td>
       <td>${escapeHtml(item.asin || item.sku || "-")}</td>
       <td>${escapeHtml(price)}</td>
       <td>${escapeHtml(item.rating ?? "-")}</td>
@@ -2091,14 +2134,7 @@ function bindAccountCreate() {
   const button = document.getElementById("accounts-create-button");
   if (!button) return;
   button.addEventListener("click", async () => {
-    const payload = promptAccountPayload();
-    if (!payload) return;
-    try {
-      await fetchJson("/admin/users", { method: "POST", body: JSON.stringify(payload) });
-      await hydrateAdminData();
-    } catch (error) {
-      alert(`新增账号失败：${error.message}`);
-    }
+    openAccountEditor();
   });
 }
 
@@ -2839,10 +2875,7 @@ function bindAccountRowActions() {
       const target = accounts.find((item) => item.recordId === id);
       if (!target) return;
       if (action === "edit") {
-        const payload = promptAccountPayload(target);
-        if (!payload) return;
-        await fetchJson(`/admin/users/${id}`, { method: "PUT", body: JSON.stringify(payload) });
-        await hydrateAdminData();
+        openAccountEditor(target);
         return;
       }
       if (confirm(`确认删除账号：${target.email}？`)) {
@@ -3035,11 +3068,18 @@ function buildReportBuilderPayload() {
   const title = document.getElementById("report-builder-title")?.value?.trim() || "";
   const reportType = document.getElementById("report-builder-type")?.value || "产品评论分析";
   const scope = document.getElementById("report-builder-scope")?.value?.trim() || "全部店铺";
+  const period = document.getElementById("report-builder-period")?.value || "30d";
+  const modules = [...document.querySelectorAll('#report-builder-modules input:checked')].map((item) => item.value);
+  const formats = [...document.querySelectorAll('#report-builder-formats input:checked')].map((item) => item.value);
   if (!title) {
     alert("请先填写报告标题");
     return null;
   }
-  return { report_type: reportType, title, scope };
+  return {
+    report_type: reportType,
+    title,
+    scope: `${scope} | 周期:${period} | 模块:${modules.join("/") || "summary"} | 格式:${formats.join("/") || "markdown"}`,
+  };
 }
 
 function renderReportBuilderPreview() {
@@ -3431,6 +3471,67 @@ function promptAccountPayload(source = null) {
   };
 }
 
+function accountEditorFields() {
+  return [
+    { type: "section", label: "账号信息", hint: "先做轻量账号管理；角色按模块控制，不细化到字段权限。" },
+    { key: "name", label: "姓名", required: true },
+    { key: "email", label: "邮箱", type: "email", required: true },
+    { key: "role", label: "角色", type: "select", options: roles.map((item) => ({ value: item.role, label: item.role })), required: true },
+    { key: "scope", label: "可访问范围", full: true, required: true },
+    { key: "stores", label: "绑定店铺", type: "textarea", full: true, hint: "支持逗号、空格或换行分隔多个店铺。" },
+    { key: "status", label: "状态", type: "select", options: [{ value: "启用", label: "启用" }, { value: "停用", label: "停用" }], required: true },
+    { key: "password", label: "初始密码", type: "text", hint: "仅新增时必填；编辑时留空表示不修改密码。" },
+  ];
+}
+
+function openAccountEditor(source = null) {
+  const values = source ? {
+    name: source.name || "",
+    email: source.email || "",
+    role: source.role || "只读访客",
+    scope: source.scope || "",
+    stores: (source.stores || []).join("\n"),
+    status: source.status || "启用",
+    password: "",
+  } : {
+    name: "",
+    email: "",
+    role: "只读访客",
+    scope: "",
+    stores: "",
+    status: "启用",
+    password: "",
+  };
+  openEditorModal({
+    title: source ? "编辑账号" : "新增账号",
+    subtitle: "账号新增、修改统一使用整表单；管理员可直接调整角色、范围、绑定店铺和状态。",
+    fields: accountEditorFields(),
+    values,
+    onSubmit: async (formData) => {
+      const payload = {
+        name: formData.name || "",
+        email: formData.email || "",
+        role: formData.role || "只读访客",
+        scope: formData.scope || "",
+        stores: splitTerms(formData.stores || ""),
+        status: formData.status || "启用",
+      };
+      if (!payload.name.trim()) throw new Error("姓名不能为空");
+      if (!payload.email.trim()) throw new Error("邮箱不能为空");
+      if (!payload.scope.trim()) throw new Error("可访问范围不能为空");
+      if (!source || String(formData.password || "").trim()) {
+        payload.password = String(formData.password || "").trim() || "ChangeMe123";
+      }
+      if (source?.recordId) {
+        await fetchJson(`/admin/users/${source.recordId}`, { method: "PUT", body: JSON.stringify(payload) });
+      } else {
+        await fetchJson("/admin/users", { method: "POST", body: JSON.stringify(payload) });
+      }
+      await hydrateAdminData();
+    },
+  });
+}
+
 function reverseLocalizeSite(site) {
   const entry = Object.entries(siteLabelMap).find(([, label]) => label === site);
   return entry?.[0] || site || "";
@@ -3516,6 +3617,7 @@ function mapProductFromApi(item) {
     site: localizeSite(item.site_code),
     platform: item.platform || "-",
     brand: item.brand || "",
+    imageUrl: isExternalUrl(item.image_url) ? item.image_url : "",
     category: item.category_name || item.category_path || "-",
     productUrl: isExternalUrl(item.product_url) ? item.product_url : "",
     price: formatPriceWithCurrency(item.price_amount, item.price_currency),
@@ -3605,7 +3707,7 @@ function mapComparisonFromApi(item) {
     negative: item.negative_ratio ?? 0,
     volume: item.review_total ?? item.review_count ?? 0,
     imageReviews: item.image_review_total ?? "-",
-    top3: item.supplier_name || item.category_name || "待补评论问题",
+    top3: item.top_issue_summary || item.supplier_name || item.category_name || "待补评论问题",
     action: item.buybox_seller ? `关注 ${item.buybox_seller}` : "待生成建议动作",
   };
 }

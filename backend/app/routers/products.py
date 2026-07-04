@@ -212,12 +212,31 @@ def compare_products(
             .all()
         )
     }
+    issue_rows = (
+        db.query(
+            Review.asin.label("asin"),
+            Review.issue_category.label("issue_category"),
+            func.count(Review.id).label("issue_total"),
+        )
+        .filter(Review.asin.in_(asin_list) if asin_list else False)
+        .group_by(Review.asin, Review.issue_category)
+        .all()
+    )
+    issue_stats: dict[str, list[tuple[str, int]]] = {}
+    for row in issue_rows:
+        if not row.asin or not row.issue_category:
+            continue
+        issue_stats.setdefault(row.asin, []).append((row.issue_category, int(row.issue_total or 0)))
 
     payload = []
     for item in items:
         stats = review_stats.get(item.asin)
         negative_total = int(stats.negative_total or 0) if stats else 0
         review_total = int(stats.review_total or 0) if stats else (item.review_count or 0)
+        top_issues = " / ".join(
+            issue
+            for issue, _ in sorted(issue_stats.get(item.asin, []), key=lambda pair: pair[1], reverse=True)[:3]
+        )
         payload.append(
             {
                 **to_dict(item),
@@ -227,12 +246,13 @@ def compare_products(
                 "negative_review_total": negative_total,
                 "negative_ratio": round((negative_total / review_total) * 100, 2) if review_total else None,
                 "image_review_total": int(stats.image_total or 0) if stats else None,
+                "top_issue_summary": top_issues or None,
             }
         )
     return {
         "items": payload,
         "matched_count": len(payload),
-        "supported_periods": ["all", "30d", "60d", "90d", "180d"],
+        "supported_periods": ["all", "30d", "60d", "90d", "180d", "365d", "1095d"],
         "notes": "当前销量字段以导入源的近30天快照为主，多周期销量需结合历史表进一步计算。",
     }
 
