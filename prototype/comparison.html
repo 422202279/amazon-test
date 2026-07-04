@@ -37,8 +37,8 @@
             <p>横向对比多个店铺同一个产品的评分、差评占比、带图评论与问题 TOP3</p>
           </div>
           <div class="topbar-actions">
-            <button class="button ghost">导出对比表</button>
-            <button class="button primary">生成 Markdown 报告</button>
+            <button class="button ghost" id="comparison-export-button">导出对比表</button>
+            <button class="button primary" id="comparison-report-button">生成 Markdown 报告</button>
           </div>
         </header>
 
@@ -78,9 +78,9 @@
               <p>先选入待对比产品，再按店铺展开销量、评分、差评和评论证据</p>
             </div>
             <div class="segmented">
-              <button class="active">销量对比</button>
-              <button>评论对比</button>
-              <button>综合判断</button>
+              <button class="active" data-comparison-view="sales">销量对比</button>
+              <button data-comparison-view="reviews">评论对比</button>
+              <button data-comparison-view="summary">综合判断</button>
             </div>
           </div>
           <div class="compare-pool">

@@ -48,6 +48,51 @@
           <div class="summary-pill warn">深度 AI 分析为增强项，不作为基础部署前提</div>
         </section>
 
+        <section class="panel" id="report-builder-section">
+          <div class="panel-head">
+            <div>
+              <h2>新建报告</h2>
+              <p>用整表单一次性选择模板、周期、数据模块和导出形式，不再逐项弹窗输入</p>
+            </div>
+            <span class="chip success">可直接生成</span>
+          </div>
+          <div class="form-grid report-builder-grid">
+            <label><span>报告标题</span><input id="report-builder-title" type="text" placeholder="例如：7月第1周同款多店铺周报" /></label>
+            <label><span>报告类型</span><select id="report-builder-type"><option value="产品评论分析">产品评论分析</option><option value="同款多店铺对比">同款多店铺对比</option><option value="差评原因统计">差评原因统计</option><option value="供应商整改建议">供应商整改建议</option></select></label>
+            <label><span>覆盖范围</span><input id="report-builder-scope" type="text" placeholder="例如：美国 / 英国 / 日本 / 韩国" /></label>
+            <label><span>统计周期</span><select id="report-builder-period"><option value="30d">近30天</option><option value="60d">近60天</option><option value="90d">近90天</option><option value="180d">近半年</option></select></label>
+            <label class="full"><span>勾选模块</span><div class="checkbox-grid" id="report-builder-modules">
+              <label><input type="checkbox" value="summary" checked /> 摘要结论</label>
+              <label><input type="checkbox" value="product_table" checked /> 产品表格</label>
+              <label><input type="checkbox" value="review_table" checked /> 评论表格</label>
+              <label><input type="checkbox" value="comparison_table" checked /> 多店铺对比表</label>
+              <label><input type="checkbox" value="issue_chart" checked /> 问题分类统计</label>
+              <label><input type="checkbox" value="supplier_tasks" checked /> 整改任务跟进</label>
+            </div></label>
+            <label class="full"><span>导出格式</span><div class="checkbox-grid" id="report-builder-formats">
+              <label><input type="checkbox" value="markdown" checked /> Markdown</label>
+              <label><input type="checkbox" value="table" checked /> Table 预览</label>
+              <label><input type="checkbox" value="excel" /> Excel 占位</label>
+            </div></label>
+          </div>
+          <div class="topbar-actions section-actions">
+            <button class="button ghost" id="report-builder-preview-button" type="button">预览报告结构</button>
+            <button class="button primary" id="report-builder-create-button" type="button">生成报告</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>模块</th>
+                  <th>内容预览</th>
+                  <th>输出形式</th>
+                </tr>
+              </thead>
+              <tbody id="report-builder-preview"></tbody>
+            </table>
+          </div>
+        </section>
+
         <section class="report-grid" id="report-cards"></section>
 
         <section class="two-col">
@@ -82,10 +127,10 @@
               <p>静态页面保留下载入口、来源维度和状态标签</p>
             </div>
             <div class="segmented">
-              <button class="active">全部</button>
-              <button>产品</button>
-              <button>对比</button>
-              <button>供应商</button>
+              <button class="active" data-report-filter="all">全部</button>
+              <button data-report-filter="产品评论分析">产品</button>
+              <button data-report-filter="同款多店铺对比">对比</button>
+              <button data-report-filter="供应商整改建议">供应商</button>
             </div>
           </div>
           <div class="table-wrap">

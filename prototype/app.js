@@ -30,9 +30,12 @@ const reviewSortState = { key: "", direction: "desc" };
 const comparisonSortState = { key: "", direction: "desc" };
 let currentUser = null;
 let activeEditorSubmit = null;
+let activeTaskGenerationRows = [];
 let issueTaxonomy = loadIssueTaxonomy();
 let dashboardNewsPage = 1;
 const dashboardNewsPageSize = 4;
+let comparisonViewMode = "sales";
+let reportFilterMode = "all";
 
 const dashboardNewsItems = [
   { title: "亚马逊欧洲站包装与回收责任新要求", tag: "政策", summary: "关注法国、德国包装回收合规，涉及宠物类目包装标识与回收责任。", url: "https://sell.amazon.com" },
@@ -483,6 +486,12 @@ function renderProducts() {
   bindProductRowActions();
 }
 
+function getStoreStatusLabel(status, enabled) {
+  if (status === "active" || enabled) return "正常监控";
+  if (status === "paused") return "暂停";
+  return "待补数据";
+}
+
 function renderProductColumnPicker() {
   const container = document.getElementById("product-column-options");
   const picker = document.getElementById("product-column-picker");
@@ -836,6 +845,8 @@ function renderComparison() {
   if (!cards || !scoreBars || !negativeBars || !volumeBars || !issueGrid || !table) return;
 
   const sortedComparison = applySort(comparisonData, comparisonSortState, getComparisonSortValue);
+  const issueNotes = buildComparisonIssueNotes(sortedComparison);
+  const periodLabel = document.getElementById("comparison-period")?.selectedOptions?.[0]?.textContent || "近30天";
 
   cards.innerHTML = sortedComparison.map((item, index) => `
     <article class="comparison-card">
@@ -853,21 +864,22 @@ function renderComparison() {
   `).join("");
 
   const maxVolume = Math.max(...sortedComparison.map((i) => Number(i.volume) || 0), 1);
-  scoreBars.innerHTML = sortedComparison.map((item) => `
-    <div class="bar-item"><span>${item.store}</span><div><i style="width:${item.score * 20}%"></i></div><strong>${item.score}</strong></div>
-  `).join("");
-  negativeBars.innerHTML = sortedComparison.map((item) => `
-    <div class="bar-item"><span>${item.store}</span><div><i style="width:${item.negative * 7}%"></i></div><strong>${item.negative}%</strong></div>
-  `).join("");
-  volumeBars.innerHTML = sortedComparison.map((item) => `
-    <div class="bar-item"><span>${item.store}</span><div><i style="width:${(item.volume / maxVolume) * 100}%"></i></div><strong>${item.volume}</strong></div>
-  `).join("");
-  issueGrid.innerHTML = [
-    ["坐感塌陷", "3 店铺共同出现"],
-    ["尺寸偏小", "US / UK / KR"],
-    ["回弹慢", "US / UK"],
-    ["物流破损", "仅 DE 站集中"],
-  ].map(([issue, note]) => `<div class="issue-pill"><strong>${issue}</strong><span>${note}</span></div>`).join("");
+  if (comparisonViewMode === "sales") {
+    scoreBars.innerHTML = sortedComparison.map((item) => `<div class="bar-item"><span>${item.store}</span><div><i style="width:${Math.max(12, item.score * 20)}%"></i></div><strong>${item.score}</strong></div>`).join("");
+    negativeBars.innerHTML = sortedComparison.map((item) => `<div class="bar-item"><span>${item.store}</span><div><i style="width:${Math.max(12, item.negative * 7)}%"></i></div><strong>${item.negative}%</strong></div>`).join("");
+    volumeBars.innerHTML = sortedComparison.map((item) => `<div class="bar-item"><span>${item.store}</span><div><i style="width:${(item.volume / maxVolume) * 100}%"></i></div><strong>${item.volume}</strong></div>`).join("");
+    issueGrid.innerHTML = issueNotes.map(([issue, note]) => `<div class="issue-pill"><strong>${issue}</strong><span>${note}</span></div>`).join("");
+  } else if (comparisonViewMode === "reviews") {
+    scoreBars.innerHTML = sortedComparison.map((item) => `<div class="bar-item"><span>${item.store}</span><div><i style="width:${Math.max(12, item.imageReviews * 2)}%"></i></div><strong>${item.imageReviews}</strong></div>`).join("");
+    negativeBars.innerHTML = sortedComparison.map((item) => `<div class="bar-item"><span>${item.store}</span><div><i style="width:${Math.max(12, item.negative * 7)}%"></i></div><strong>${item.negative}%</strong></div>`).join("");
+    volumeBars.innerHTML = sortedComparison.map((item) => `<div class="bar-item"><span>${item.store}</span><div><i style="width:${(item.volume / maxVolume) * 100}%"></i></div><strong>${item.volume}</strong></div>`).join("");
+    issueGrid.innerHTML = issueNotes.map(([issue, note]) => `<div class="issue-pill"><strong>${issue}</strong><span>${note}</span></div>`).join("");
+  } else {
+    scoreBars.innerHTML = sortedComparison.map((item) => `<div class="bar-item"><span>${item.store}</span><div><i style="width:${Math.max(12, item.sales / Math.max(...sortedComparison.map((row) => Number(row.sales) || 0), 1) * 100)}%"></i></div><strong>${item.sales}</strong></div>`).join("");
+    negativeBars.innerHTML = sortedComparison.map((item) => `<div class="bar-item"><span>${item.store}</span><div><i style="width:${Math.max(12, item.score * 20)}%"></i></div><strong>${item.score}</strong></div>`).join("");
+    volumeBars.innerHTML = sortedComparison.map((item) => `<div class="bar-item"><span>${item.store}</span><div><i style="width:${Math.max(12, item.negative * 7)}%"></i></div><strong>${item.negative}%</strong></div>`).join("");
+    issueGrid.innerHTML = sortedComparison.map((item) => `<div class="issue-pill"><strong>${item.store}</strong><span>${periodLabel}建议：${item.action}</span></div>`).join("");
+  }
 
   table.innerHTML = sortedComparison.map((item) => `
     <tr>
@@ -902,10 +914,47 @@ function renderComparison() {
       };
     });
   });
+
+  const notes = document.getElementById("comparison-notes");
+  if (notes) {
+    notes.textContent = comparisonViewMode === "sales"
+      ? `${periodLabel}视图：销量 / 销售额 / 评分 / 差评占比联动对比`
+      : comparisonViewMode === "reviews"
+        ? `${periodLabel}视图：评论总量 / 带图评论 / 差评占比 / 问题分布`
+        : `${periodLabel}视图：综合判断按销量、评分、差评占比和建议动作汇总`;
+  }
 }
 
 function getComparisonSortValue(item, key) {
   return item[key] ?? "";
+}
+
+function buildComparisonIssueNotes(items) {
+  const issueMap = new Map();
+  items.forEach((item) => {
+    String(item.top3 || "")
+      .split("/")
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .forEach((issue) => {
+        if (!issueMap.has(issue)) issueMap.set(issue, []);
+        issueMap.get(issue).push(item.site);
+      });
+  });
+  return [...issueMap.entries()]
+    .sort((left, right) => right[1].length - left[1].length)
+    .slice(0, 4)
+    .map(([issue, sites]) => [issue, `${[...new Set(sites)].join(" / ")} 关注`]);
+}
+
+function comparisonSummaryScope() {
+  return comparisonData.map((item) => `${item.store}-${item.site}`).join(" / ") || "全部店铺";
+}
+
+function exportComparisonTable() {
+  const headers = ["店铺", "站点", "近30天销量", "近30天销售额", "评分", "差评占比", "评论总数", "带图评论", "主要问题TOP3", "建议动作"];
+  const rows = comparisonData.map((item) => [item.store, item.site, item.sales, item.salesAmount, item.score, `${item.negative}%`, item.volume, item.imageReviews, item.top3, item.action]);
+  downloadCsv(`comparison-${Date.now()}.csv`, [headers, ...rows]);
 }
 
 function renderDetail() {
@@ -984,16 +1033,23 @@ function renderReports() {
     </article>
   `).join("");
 
-  table.innerHTML = reports.map((report) => `
+  const filteredReports = reports.filter((report) => reportFilterMode === "all" || report.type === reportFilterMode);
+  table.innerHTML = filteredReports.map((report) => `
     <tr>
       <td>${report.name}</td>
       <td>${report.type}</td>
       <td>${report.range}</td>
       <td>${report.time}</td>
       <td><span class="status ${statusClass(report.status)}">${report.status}</span></td>
-      <td>${report.recordId ? `<a class="link-inline" href="${API_BASE}/reports/${report.recordId}/markdown" target="_blank" rel="noreferrer">Markdown</a>` : '<a class="link-inline" href="#">Markdown</a>'} / <a class="link-inline" href="#">Excel</a></td>
+      <td>${report.recordId ? `<a class="link-inline" href="${API_BASE}/reports/${report.recordId}/markdown" target="_blank" rel="noreferrer">Markdown</a>` : '<a class="link-inline" href="#">Markdown</a>'} / <a class="link-inline" href="#" data-report-export="${report.recordId || report.name}">Table</a></td>
     </tr>
   `).join("");
+  document.querySelectorAll("[data-report-export]").forEach((link) => {
+    link.onclick = (event) => {
+      event.preventDefault();
+      exportReportsTable();
+    };
+  });
 }
 
 function renderAccountManagement() {
@@ -1155,6 +1211,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderAccountManagement();
   renderIssueTaxonomyManager();
   renderIssueFilterOptions();
+  renderReportBuilderPreview();
   await hydrateLiveData();
   await hydrateScheduleSettings();
   await hydrateOpsInsights();
@@ -1162,6 +1219,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   bindStoreFilters();
   bindProductFilters();
   bindReviewFilters();
+  updateSiteFilterOptions("products");
+  updateSiteFilterOptions("reviews");
   updateStoreFilterOptions("products");
   updateStoreFilterOptions("reviews");
   bindReviewViewSwitch();
@@ -1170,6 +1229,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   bindCrudActions();
   bindDashboardWidgets();
   bindIssueTaxonomyManager();
+  bindComparisonViewSwitch();
+  bindComparisonActions();
+  bindReportFilterSwitch();
 });
 
 function applyInitialPageFilters() {
@@ -1274,7 +1336,10 @@ function bindReviewViewSwitch() {
 
 function bindProductFilters() {
   const button = document.getElementById("products-apply-button");
-  document.getElementById("products-platform-filter")?.addEventListener("change", () => updateStoreFilterOptions("products"));
+  document.getElementById("products-platform-filter")?.addEventListener("change", () => {
+    updateSiteFilterOptions("products");
+    updateStoreFilterOptions("products");
+  });
   document.getElementById("products-site-filter")?.addEventListener("change", () => updateStoreFilterOptions("products"));
   document.getElementById("products-store-filter")?.addEventListener("change", () => backfillSiteFromStore("products"));
   if (!button) return;
@@ -1285,13 +1350,33 @@ function bindProductFilters() {
 
 function bindReviewFilters() {
   const button = document.getElementById("reviews-apply-button");
-  document.getElementById("reviews-platform-filter")?.addEventListener("change", () => updateStoreFilterOptions("reviews"));
+  document.getElementById("reviews-platform-filter")?.addEventListener("change", () => {
+    updateSiteFilterOptions("reviews");
+    updateStoreFilterOptions("reviews");
+  });
   document.getElementById("reviews-site-filter")?.addEventListener("change", () => updateStoreFilterOptions("reviews"));
   document.getElementById("reviews-store-filter")?.addEventListener("change", () => backfillSiteFromStore("reviews"));
   if (!button) return;
   button.addEventListener("click", async () => {
     await hydrateReviews();
   });
+}
+
+function updateSiteFilterOptions(prefix) {
+  const select = document.getElementById(`${prefix}-site-filter`);
+  const platform = document.getElementById(`${prefix}-platform-filter`)?.value || "";
+  if (!select) return;
+  const current = select.value;
+  const allowed = platformSites(platform);
+  const allowMultiAmazon = platform === "Amazon";
+  const options = siteOptions().filter((item) => allowed.includes(item.value));
+  select.innerHTML = `<option value="">${allowMultiAmazon ? "全部站点" : platform ? "韩国" : "全部站点"}</option>${options.map((item) => `<option value="${item.value}">${item.label}</option>`).join("")}`;
+  select.disabled = Boolean(platform && !allowMultiAmazon && options.length === 1);
+  if (allowed.includes(current)) {
+    select.value = current;
+  } else if (!allowMultiAmazon && options.length === 1) {
+    select.value = options[0].value;
+  }
 }
 
 function updateStoreFilterOptions(prefix) {
@@ -1328,6 +1413,48 @@ function bindComparisonSubmit() {
   if (!button) return;
   button.addEventListener("click", async () => {
     await hydrateComparison();
+  });
+}
+
+function bindComparisonViewSwitch() {
+  const buttons = document.querySelectorAll("[data-comparison-view]");
+  if (!buttons.length) return;
+  buttons.forEach((button) => {
+    button.onclick = () => {
+      buttons.forEach((item) => item.classList.remove("active"));
+      button.classList.add("active");
+      comparisonViewMode = button.getAttribute("data-comparison-view") || "sales";
+      renderComparison();
+    };
+  });
+}
+
+function bindComparisonActions() {
+  document.getElementById("comparison-export-button")?.addEventListener("click", exportComparisonTable);
+  document.getElementById("comparison-report-button")?.addEventListener("click", async () => {
+    const title = `同款多店铺对比报告-${new Date().toISOString().slice(0, 10)}`;
+    try {
+      await fetchJson("/reports", { method: "POST", body: JSON.stringify({ report_type: "同款多店铺对比", title, scope: comparisonSummaryScope() }) });
+      alert("同款多店铺 Markdown 报告已生成，可到报告中心查看。");
+      if (document.body.dataset.page === "comparison") {
+        window.location.href = "./reports.html";
+      }
+    } catch (error) {
+      alert(`生成对比报告失败：${error.message}`);
+    }
+  });
+}
+
+function bindReportFilterSwitch() {
+  const buttons = document.querySelectorAll("[data-report-filter]");
+  if (!buttons.length) return;
+  buttons.forEach((button) => {
+    button.onclick = () => {
+      buttons.forEach((item) => item.classList.remove("active"));
+      button.classList.add("active");
+      reportFilterMode = button.getAttribute("data-report-filter") || "all";
+      renderReports();
+    };
   });
 }
 
@@ -1382,6 +1509,10 @@ async function hydrateStores() {
         return [item.name, item.site, item.seller].some((value) => String(value || "").toLowerCase().includes(search));
       });
     renderStores();
+    updateSiteFilterOptions("products");
+    updateStoreFilterOptions("products");
+    updateSiteFilterOptions("reviews");
+    updateStoreFilterOptions("reviews");
   } catch (error) {
     console.warn("Stores API unavailable, fallback to mock data", error);
   }
@@ -1427,7 +1558,11 @@ async function hydrateProducts() {
     if (storeName) params.set("store_name", storeName);
     const data = await fetchJson(`/products?${params.toString()}`);
     if (!data.items?.length) return;
-    products = data.items.map(mapProductFromApi);
+    products = data.items
+      .map(mapProductFromApi)
+      .filter((item) => !platform || item.platform === platform)
+      .filter((item) => !siteCode || reverseLocalizeSite(item.site) === siteCode)
+      .filter((item) => !storeName || item.store === storeName);
     renderProducts();
     if (document.body.dataset.page === "dashboard") renderDashboard();
   } catch (error) {
@@ -1453,6 +1588,15 @@ async function hydrateReviews() {
     if (reviewViewMode === "negative") {
       reviews = reviews.filter((item) => item.stars <= 3);
     }
+    reviews = mode === "product"
+      ? reviews
+        .filter((item) => !platform || (item.recent_reviews || []).some((review) => review.platform === platform))
+        .filter((item) => !siteCode || (item.sites || []).includes(localizeSite(siteCode)))
+        .filter((item) => !storeName || (item.stores || []).includes(storeName))
+      : reviews
+        .filter((item) => !platform || item.platform === platform)
+        .filter((item) => !siteCode || reverseLocalizeSite(item.site) === siteCode)
+        .filter((item) => !storeName || item.store === storeName);
     reviews = filterReviewsLocally(reviews, mode === "product");
     renderReviews();
     if (document.body.dataset.page === "dashboard") renderDashboard();
@@ -1707,6 +1851,10 @@ function bindGenerateTasks() {
   const button = document.getElementById("reviews-generate-tasks-button") || document.getElementById("tasks-generate-button");
   if (!button) return;
   button.addEventListener("click", async () => {
+    if (document.body.dataset.page === "reviews") {
+      openReviewTaskGenerationModal();
+      return;
+    }
     try {
       const result = await fetchJson("/supplier-tasks/generate-from-reviews?limit=100", { method: "POST" });
       await hydrateTasks();
@@ -1751,14 +1899,7 @@ function bindTaskCreate() {
   const button = document.getElementById("tasks-create-button");
   if (!button) return;
   button.addEventListener("click", async () => {
-    const payload = promptTaskPayload();
-    if (!payload) return;
-    try {
-      await fetchJson("/supplier-tasks", { method: "POST", body: JSON.stringify(payload) });
-      await hydrateTasks();
-    } catch (error) {
-      alert(`新增任务失败：${error.message}`);
-    }
+    openTaskEditor();
   });
 }
 
@@ -1980,7 +2121,7 @@ function reviewEditorFields() {
     { key: "issue_category", label: "问题分类", type: "select", options: issueOptions() },
     { key: "sentiment", label: "情绪", type: "select", options: sentimentOptions() },
     { key: "feedback_to_supplier", label: "是否反馈供应商", type: "select", options: yesNoOptions() },
-    { key: "rectification_status", label: "整改状态" },
+    { key: "rectification_status", label: "整改状态", type: "select", options: rectificationStatusOptions() },
     { key: "review_url", label: "评论链接", full: true },
     { key: "product_url", label: "产品链接", full: true },
     { key: "review_images", label: "图片/视频标记" },
@@ -2286,6 +2427,10 @@ function yesNoOptions() {
   ];
 }
 
+function rectificationStatusOptions() {
+  return ["待反馈", "处理中", "观察中", "已整改", "已关闭"].map((value) => ({ value, label: value }));
+}
+
 function loadIssueTaxonomy() {
   try {
     const stored = JSON.parse(localStorage.getItem(ISSUE_TAXONOMY_KEY) || "null");
@@ -2491,10 +2636,7 @@ function bindTaskRowActions() {
       const target = tasks.find((item) => item.recordId === id);
       if (!target) return;
       if (action === "edit") {
-        const payload = promptTaskPayload(target);
-        if (!payload) return;
-        await fetchJson(`/supplier-tasks/${id}`, { method: "PUT", body: JSON.stringify(payload) });
-        await hydrateTasks();
+        openTaskEditor(target);
         return;
       }
       if (confirm(`确认删除整改任务：${target.id}？`)) {
@@ -2535,10 +2677,7 @@ function bindStoreRowActions() {
       const target = stores.find((item) => item.recordId === id);
       if (!target) return;
       if (action === "edit") {
-        const payload = promptStorePayload(target);
-        if (!payload) return;
-        await fetchJson(`/stores/${id}`, { method: "PUT", body: JSON.stringify(payload) });
-        await hydrateStores();
+        openStoreEditor(target);
         return;
       }
       if (confirm(`确认删除店铺：${target.name}？`)) {
@@ -2616,18 +2755,155 @@ function promptStorePayload(source = null) {
   };
 }
 
+function storeEditorFields() {
+  return [
+    { type: "section", label: "基础信息", hint: "店铺名、平台、站点、状态为必填；韩国平台默认只允许韩国站点。" },
+    { key: "name", label: "店铺名", required: true },
+    { key: "platform", label: "平台", type: "select", options: platformOptions(), required: true },
+    { key: "site_code", label: "站点", type: "select", options: siteOptions(), required: true },
+    { key: "country_code", label: "国家代码", required: true },
+    { key: "seller_identifier", label: "Seller ID / 店铺标识" },
+    { key: "store_page_url", label: "店铺链接", full: true },
+    { key: "status", label: "状态", type: "select", options: [{ value: "active", label: "启用" }, { value: "paused", label: "暂停" }], required: true },
+    { key: "data_source", label: "数据来源", type: "select", options: [{ value: "manual_sheet", label: "表格导入" }, { value: "internal_store_links", label: "店铺链接表" }, { value: "manual", label: "手动维护" }], required: true },
+    { key: "is_enabled", label: "是否启用", type: "select", options: [{ value: "yes", label: "启用" }, { value: "no", label: "停用" }], required: true },
+    { key: "notes", label: "备注", type: "textarea", full: true },
+  ];
+}
+
+function openStoreEditor(source = null) {
+  const values = source ? {
+    name: source.name || "",
+    platform: source.platform || "Amazon",
+    site_code: reverseLocalizeSite(source.site) || "US",
+    country_code: source.countryCode || reverseLocalizeSite(source.site) || "",
+    seller_identifier: source.seller === "-" ? "" : (source.seller || ""),
+    store_page_url: source.storePageUrl || "",
+    status: source.rawStatus || "active",
+    data_source: source.dataSource || "manual_sheet",
+    is_enabled: source.enabled ? "yes" : "no",
+    notes: source.notes || "",
+  } : {
+    name: "",
+    platform: "Amazon",
+    site_code: "US",
+    country_code: "US",
+    seller_identifier: "",
+    store_page_url: "",
+    status: "active",
+    data_source: "manual",
+    is_enabled: "yes",
+    notes: "",
+  };
+  openEditorModal({
+    title: source ? "编辑店铺" : "新增店铺",
+    subtitle: "新增和修改都使用整表单；平台切换后会联动可选站点。",
+    fields: storeEditorFields(),
+    values,
+    onReady: bindStoreEditorInteractions,
+    onSubmit: async (formData) => {
+      const payload = {
+        name: formData.name || "",
+        platform: formData.platform || "Amazon",
+        site_code: formData.site_code || "US",
+        country_code: formData.country_code || formData.site_code || "US",
+        seller_identifier: formData.seller_identifier || "",
+        store_page_url: formData.store_page_url || "",
+        status: formData.status || "active",
+        data_source: formData.data_source || "manual",
+        notes: formData.notes || "",
+        is_enabled: formData.is_enabled === "yes",
+      };
+      if (!payload.name.trim()) throw new Error("店铺名不能为空");
+      if (!platformSites(payload.platform).includes(payload.site_code)) throw new Error("平台与站点不匹配");
+      if (!payload.country_code.trim()) throw new Error("国家代码不能为空");
+      if (source?.recordId) {
+        await fetchJson(`/stores/${source.recordId}`, { method: "PUT", body: JSON.stringify(payload) });
+      } else {
+        await fetchJson("/stores", { method: "POST", body: JSON.stringify(payload) });
+      }
+      await hydrateStores();
+    },
+  });
+}
+
+function bindStoreEditorInteractions() {
+  const platformNode = document.querySelector('[data-editor-key="platform"]');
+  const siteNode = document.querySelector('[data-editor-key="site_code"]');
+  const countryNode = document.querySelector('[data-editor-key="country_code"]');
+  const sync = () => {
+    const platform = platformNode?.value || "Amazon";
+    const allowed = platformSites(platform);
+    if (siteNode) {
+      [...siteNode.options].forEach((option) => {
+        option.hidden = option.value ? !allowed.includes(option.value) : false;
+      });
+      if (!allowed.includes(siteNode.value)) siteNode.value = allowed[0] || "US";
+    }
+    if (countryNode) countryNode.value = siteNode?.value || "US";
+  };
+  platformNode?.addEventListener("change", sync);
+  siteNode?.addEventListener("change", sync);
+  sync();
+}
+
+function buildReportBuilderPayload() {
+  const title = document.getElementById("report-builder-title")?.value?.trim() || "";
+  const reportType = document.getElementById("report-builder-type")?.value || "产品评论分析";
+  const scope = document.getElementById("report-builder-scope")?.value?.trim() || "全部店铺";
+  if (!title) {
+    alert("请先填写报告标题");
+    return null;
+  }
+  return { report_type: reportType, title, scope };
+}
+
+function renderReportBuilderPreview() {
+  const body = document.getElementById("report-builder-preview");
+  if (!body) return;
+  const modules = [...document.querySelectorAll('#report-builder-modules input:checked')].map((item) => item.value);
+  const formats = [...document.querySelectorAll('#report-builder-formats input:checked')].map((item) => item.value);
+  const mapping = {
+    summary: ["摘要结论", "核心指标概览、站点异常、重点差评摘要", formats.join(" / ") || "Markdown"],
+    product_table: ["产品表格", "产品总表关键字段、销量、评分、链接", formats.includes("table") ? "Table + Markdown" : "Markdown"],
+    review_table: ["评论表格", "评论内容、问题分类、是否反馈供应商、整改状态", formats.includes("table") ? "Table + Markdown" : "Markdown"],
+    comparison_table: ["多店铺对比表", "销量、销售额、评分、差评占比、TOP问题", formats.includes("table") ? "Table + Markdown" : "Markdown"],
+    issue_chart: ["问题分类统计", "TOP5 问题分类和站点分布", "Markdown"],
+    supplier_tasks: ["整改任务跟进", "任务状态、建议方案、实际整改", formats.includes("table") ? "Table + Markdown" : "Markdown"],
+  };
+  body.innerHTML = modules.map((key) => {
+    const [label, content, output] = mapping[key] || [key, "待定义", formats.join(" / ")];
+    return `<tr><td>${label}</td><td>${content}</td><td>${output}</td></tr>`;
+  }).join("") || '<tr><td colspan="3">请至少勾选一个模块</td></tr>';
+}
+
+function exportReportsTable() {
+  const headers = ["报告名称", "类型", "覆盖范围", "生成时间", "状态"];
+  const rows = reports
+    .filter((report) => reportFilterMode === "all" || report.type === reportFilterMode)
+    .map((report) => [report.name, report.type, report.range, report.time, report.status]);
+  downloadCsv(`reports-${Date.now()}.csv`, [headers, ...rows]);
+}
+
+function downloadCsv(filename, rows) {
+  const csv = rows
+    .map((row) => row.map((cell) => `"${String(cell ?? "").replaceAll('"', '""')}"`).join(","))
+    .join("\n");
+  const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(link.href);
+}
+
 function bindStoreCreate() {
   const button = document.getElementById("stores-create-button");
   if (!button) return;
   button.addEventListener("click", async () => {
-    const payload = promptStorePayload();
-    if (!payload) return;
-    try {
-      await fetchJson("/stores", { method: "POST", body: JSON.stringify(payload) });
-      await hydrateStores();
-    } catch (error) {
-      alert(`新增店铺失败：${error.message}`);
-    }
+    openStoreEditor();
   });
 }
 
@@ -2653,20 +2929,13 @@ function bindStoreImport() {
 function bindReportActions() {
   const createButton = document.getElementById("reports-create-button");
   const refreshButton = document.getElementById("reports-refresh-button");
+  const builderPreviewButton = document.getElementById("report-builder-preview-button");
+  const builderCreateButton = document.getElementById("report-builder-create-button");
   if (createButton) {
-    createButton.addEventListener("click", async () => {
-      const reportType = prompt("报告类型", "产品评论分析");
-      if (!reportType) return;
-      const title = prompt("报告标题", `${reportType}-${new Date().toISOString().slice(0, 10)}`);
-      if (!title) return;
-      const scope = prompt("覆盖范围", "全部店铺") || "全部店铺";
-      try {
-        await fetchJson("/reports", { method: "POST", body: JSON.stringify({ report_type: reportType, title, scope }) });
-        await hydrateReports();
-        alert("Markdown 报告已生成");
-      } catch (error) {
-        alert(`生成报告失败：${error.message}`);
-      }
+    createButton.addEventListener("click", () => {
+      document.getElementById("report-builder-title")?.focus();
+      renderReportBuilderPreview();
+      window.scrollTo({ top: 0, behavior: "smooth" });
     });
   }
   if (refreshButton) {
@@ -2674,6 +2943,27 @@ function bindReportActions() {
       await hydrateReports();
     });
   }
+  if (builderPreviewButton) {
+    builderPreviewButton.onclick = () => renderReportBuilderPreview();
+  }
+  if (builderCreateButton) {
+    builderCreateButton.onclick = async () => {
+      const payload = buildReportBuilderPayload();
+      if (!payload) return;
+      try {
+        await fetchJson("/reports", { method: "POST", body: JSON.stringify(payload) });
+        await hydrateReports();
+        renderReportBuilderPreview();
+        alert("报告已生成，列表已刷新。");
+      } catch (error) {
+        alert(`生成报告失败：${error.message}`);
+      }
+    };
+  }
+  document.querySelectorAll("#report-builder-section input, #report-builder-section select").forEach((node) => {
+    node.addEventListener("change", renderReportBuilderPreview);
+    node.addEventListener("input", renderReportBuilderPreview);
+  });
 }
 
 function promptReviewPayload(source = null) {
@@ -2725,6 +3015,222 @@ function promptTaskPayload(source = null) {
     actual_rectification: prompt("实际整改", source?.actualRectification || "") || "",
     notes: "",
   };
+}
+
+function taskEditorFields() {
+  return [
+    { type: "section", label: "基础信息", hint: "任务编号可自动生成；产品、ASIN、问题类型建议明确填全，方便后续评论联动。" },
+    { key: "task_code", label: "任务编号", required: true },
+    { key: "asin", label: "ASIN", required: true },
+    { key: "product_title", label: "产品标题", full: true, required: true },
+    { key: "supplier_name", label: "供应商", datalist: "task-supplier-options", options: supplierOptionValues(), required: true },
+    { key: "issue_category", label: "问题类型", type: "select", options: issueOptions(), required: true },
+    { key: "evidence_summary", label: "证据摘要", type: "textarea", full: true, hint: "这里建议写评论证据、站点、星级、是否带图等关键信息。" },
+    { key: "suggested_action", label: "建议方案", type: "textarea", full: true },
+    { key: "actual_rectification", label: "实际整改", type: "textarea", full: true },
+    { key: "priority", label: "优先级", type: "select", options: [{ value: "high", label: "高" }, { value: "medium", label: "中" }, { value: "low", label: "低" }], required: true },
+    { key: "status", label: "状态", type: "select", options: [{ value: "pending_feedback", label: "待反馈" }, { value: "in_progress", label: "处理中" }, { value: "observing", label: "观察中" }, { value: "resolved", label: "已整改" }], required: true },
+    { key: "due_date", label: "截止日期", type: "text", hint: "格式：YYYY-MM-DD" },
+    { key: "notes", label: "备注", type: "textarea", full: true },
+  ];
+}
+
+function openTaskEditor(source = null) {
+  const values = source ? {
+    task_code: source.id || "",
+    asin: source.asin || "",
+    product_title: source.product || "",
+    supplier_name: source.supplier || "",
+    issue_category: source.issue || "待分类",
+    evidence_summary: source.evidence || "",
+    suggested_action: source.suggestedAction || "",
+    actual_rectification: source.actualRectification || "",
+    priority: source.priority === "高" ? "high" : source.priority === "低" ? "low" : "medium",
+    status: mapTaskStatusToApi(source.status || "待反馈"),
+    due_date: source.due && source.due !== "-" ? source.due : "",
+    notes: "",
+  } : {
+    task_code: buildTaskCode("", ""),
+    asin: "",
+    product_title: "",
+    supplier_name: "",
+    issue_category: "待分类",
+    evidence_summary: "",
+    suggested_action: "",
+    actual_rectification: "",
+    priority: "medium",
+    status: "pending_feedback",
+    due_date: "",
+    notes: "",
+  };
+  openEditorModal({
+    title: source ? "编辑整改任务" : "新建整改任务",
+    subtitle: "任务新增和修改都使用整表单；任务编号支持按 ASIN 自动生成。",
+    fields: taskEditorFields(),
+    values,
+    onReady: bindTaskEditorInteractions,
+    onSubmit: async (formData) => {
+      const payload = {
+        task_code: formData.task_code || buildTaskCode(formData.asin, formData.issue_category),
+        asin: formData.asin || "",
+        product_title: formData.product_title || "",
+        supplier_name: formData.supplier_name || "",
+        issue_category: formData.issue_category || "待分类",
+        evidence_summary: formData.evidence_summary || "",
+        status: formData.status || "pending_feedback",
+        priority: formData.priority || "medium",
+        due_date: formData.due_date || null,
+        suggested_action: formData.suggested_action || "",
+        actual_rectification: formData.actual_rectification || "",
+        notes: formData.notes || "",
+      };
+      if (!payload.asin.trim()) throw new Error("ASIN 不能为空");
+      if (!payload.product_title.trim()) throw new Error("产品标题不能为空");
+      if (!payload.supplier_name.trim()) throw new Error("供应商不能为空");
+      if (source?.recordId) {
+        await fetchJson(`/supplier-tasks/${source.recordId}`, { method: "PUT", body: JSON.stringify(payload) });
+      } else {
+        await fetchJson("/supplier-tasks", { method: "POST", body: JSON.stringify(payload) });
+      }
+      await hydrateTasks();
+    },
+  });
+}
+
+function bindTaskEditorInteractions() {
+  const asinNode = document.querySelector('[data-editor-key="asin"]');
+  const issueNode = document.querySelector('[data-editor-key="issue_category"]');
+  const codeNode = document.querySelector('[data-editor-key="task_code"]');
+  const sync = () => {
+    if (codeNode && !codeNode.dataset.userEdited) {
+      codeNode.value = buildTaskCode(asinNode?.value || "", issueNode?.value || "");
+    }
+  };
+  codeNode?.addEventListener("input", () => {
+    codeNode.dataset.userEdited = codeNode.value.trim() ? "yes" : "";
+  });
+  asinNode?.addEventListener("input", sync);
+  issueNode?.addEventListener("change", sync);
+  sync();
+}
+
+function buildTaskCode(asin, issue) {
+  const date = new Date().toISOString().slice(2, 10).replaceAll("-", "");
+  const shortAsin = String(asin || "TASK").trim().slice(-6) || "TASK";
+  const shortIssue = String(issue || "ISS").trim().slice(0, 2).toUpperCase() || "IS";
+  return `SR-${date}-${shortAsin}-${shortIssue}`;
+}
+
+function openReviewTaskGenerationModal() {
+  const eligible = reviews
+    .filter((item) => !("recent_reviews" in item))
+    .filter((item) => Number(item.stars || 0) <= 3)
+    .filter((item) => item.feedback !== "已反馈");
+  if (!eligible.length) {
+    alert("当前筛选结果里没有可生成整改任务的差评。");
+    return;
+  }
+  activeTaskGenerationRows = eligible.map((item) => ({ ...item, checked: true }));
+  const modal = ensureEditorModal();
+  const titleNode = document.getElementById("editor-modal-title");
+  const subtitleNode = document.getElementById("editor-modal-subtitle");
+  const form = document.getElementById("editor-modal-form");
+  if (!form) return;
+  if (titleNode) titleNode.textContent = "从评论生成整改任务";
+  if (subtitleNode) subtitleNode.textContent = "默认全选当前可生成的差评；可取消个别记录，再批量生成整改任务并同步评论状态。";
+  form.innerHTML = `
+    <div class="full">
+      <table class="modal-table">
+        <thead>
+          <tr>
+            <th><input id="task-gen-check-all" type="checkbox" checked /></th>
+            <th>评论</th>
+            <th>产品 / ASIN</th>
+            <th>站点</th>
+            <th>问题分类</th>
+            <th>整改状态</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${activeTaskGenerationRows.map((item, index) => `
+            <tr>
+              <td><input type="checkbox" data-task-gen-row="${index}" checked /></td>
+              <td><div class="cell-title">${escapeHtml(item.title)}</div><div class="cell-sub">${escapeHtml(item.content)}</div></td>
+              <td><div class="cell-title">${escapeHtml(item.product)}</div><div class="cell-sub">${escapeHtml(item.asin)}</div></td>
+              <td>${escapeHtml(item.site)}<div class="cell-sub">${escapeHtml(item.store)}</div></td>
+              <td>${escapeHtml(item.issue || "待分类")}</td>
+              <td>${escapeHtml(item.rectify || "待反馈")}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+  document.getElementById("task-gen-check-all")?.addEventListener("change", (event) => {
+    const checked = Boolean(event.target.checked);
+    document.querySelectorAll("[data-task-gen-row]").forEach((node) => {
+      node.checked = checked;
+    });
+  });
+  activeEditorSubmit = async () => {
+    const selected = activeTaskGenerationRows.filter((_, index) => document.querySelector(`[data-task-gen-row="${index}"]`)?.checked);
+    if (!selected.length) throw new Error("请至少勾选一条评论");
+    for (const review of selected) {
+      const taskPayload = {
+        task_code: buildTaskCode(review.asin, review.issue),
+        asin: review.asin || "",
+        product_title: review.product || "",
+        supplier_name: review.supplier || "待补供应商",
+        issue_category: review.issue || "待分类",
+        evidence_summary: `${review.site} / ${review.store} / ${review.stars}星 / ${review.title} / ${review.content}`.slice(0, 300),
+        status: "pending_feedback",
+        priority: review.stars <= 1 ? "high" : review.stars === 2 ? "medium" : "low",
+        due_date: null,
+        suggested_action: "",
+        actual_rectification: "",
+        notes: `来源评论 ${review.id}`,
+      };
+      await fetchJson("/supplier-tasks", { method: "POST", body: JSON.stringify(taskPayload) });
+      if (review.recordId) {
+        await fetchJson(`/reviews/${review.recordId}`, {
+          method: "PUT",
+          body: JSON.stringify({
+            platform: review.platform,
+            site_code: reverseLocalizeSite(review.site),
+            store_name: review.store,
+            asin: review.asin,
+            product_title: review.product,
+            review_external_id: review.id,
+            review_url: review.reviewUrl || "",
+            product_url: review.productUrl || "",
+            star_rating: review.stars,
+            review_title: review.title,
+            review_content: review.content,
+            review_summary_cn: review.summaryCn || "",
+            review_images: review.mediaType === "video" ? "video" : (review.hasImage ? "image" : ""),
+            reviewer_name: "Local User",
+            review_country: reverseLocalizeSite(review.site) || "US",
+            review_language: "zh",
+            is_verified_purchase: true,
+            helpful_count: 0,
+            has_images: Boolean(review.hasImage),
+            is_negative_review: Number(review.stars) <= 3,
+            issue_category: review.issue || "待分类",
+            sentiment: review.mood || "负面",
+            feedback_to_supplier: true,
+            rectification_status: "待反馈",
+            source_type: review.source || "手动录入",
+            reviewed_at: review.reviewedAt || new Date().toISOString(),
+          }),
+        });
+      }
+    }
+    await hydrateReviews();
+    await hydrateTasks();
+    closeEditorModal();
+    alert(`已生成 ${selected.length} 条整改任务，并同步更新对应评论状态。`);
+  };
+  modal.classList.add("open");
 }
 
 function promptAccountPayload(source = null) {
@@ -2863,7 +3369,7 @@ function mapStoreFromApi(item) {
     products: "-",
     reviews: "-",
     rating: "-",
-    status: item.is_enabled ? "正常监控" : "暂停",
+    status: getStoreStatusLabel(item.status, item.is_enabled),
     rawStatus: item.status || (item.is_enabled ? "active" : "paused"),
     sync: item.updated_at || "-",
     storePageUrl: item.store_page_url || "",
