@@ -36,6 +36,7 @@ let dashboardNewsPage = 1;
 const dashboardNewsPageSize = 4;
 let comparisonViewMode = "sales";
 let reportFilterMode = "all";
+const selectedProductRecordIds = new Set();
 
 const dashboardNewsItems = [
   { title: "亚马逊欧洲站包装与回收责任新要求", tag: "政策", summary: "关注法国、德国包装回收合规，涉及宠物类目包装标识与回收责任。", url: "https://sell.amazon.com" },
@@ -313,11 +314,12 @@ function renderDashboard() {
           </div>
         </div>
       </td>
-      <td>${item.store}</td>
+      <td>${item.store}<span class="cell-sub">${item.site}</span></td>
       <td>${item.rating}</td>
       <td>${item.negative}</td>
       <td>${item.imageReviews}</td>
       <td><span class="chip warn">${item.issue}</span></td>
+      <td>${item.updatedAt || item.launchDate || "-"}</td>
       <td><span class="status ${statusClass(item.rectify)}">${item.rectify}</span></td>
     </tr>
   `).join("");
@@ -457,11 +459,12 @@ function renderProducts() {
   if (!body || !head) return;
 
   const visibleColumns = productColumns.filter((column) => column.visible);
-  head.innerHTML = `${visibleColumns.map((column) => `<th data-col="${column.key}">${column.label}${sortIndicator(productSortState, column.key)}</th>`).join("")}<th>操作</th>`;
+  head.innerHTML = `<th><input class="table-check" id="products-check-all" type="checkbox" ${sortedSelectionState(products) ? "checked" : ""} /></th>${visibleColumns.map((column) => `<th data-col="${column.key}">${column.label}${sortIndicator(productSortState, column.key)}</th>`).join("")}<th>操作</th>`;
 
   const sortedProducts = applySort(products, productSortState, getProductSortValue);
   body.innerHTML = sortedProducts.map((item) => `
     <tr>
+      <td><input class="table-check" data-product-select="${item.recordId || item.asin}" type="checkbox" ${selectedProductRecordIds.has(item.recordId || item.asin) ? "checked" : ""} /></td>
       ${visibleColumns.map((column) => `<td data-col="${column.key}">${renderProductCell(item, column.key)}</td>`).join("")}
       <td>${renderRowActions("product", item.recordId)}</td>
     </tr>
@@ -483,6 +486,7 @@ function renderProducts() {
   });
 
   updateProductSummary(sortedProducts);
+  bindProductSelection();
   bindProductRowActions();
 }
 
@@ -593,6 +597,38 @@ function renderProductCell(item, key) {
     rectify: `<span class="status ${statusClass(item.rectify)}">${item.rectify}</span>`,
   };
   return cells[key] ?? "";
+}
+
+function sortedSelectionState(items) {
+  if (!items.length) return false;
+  return items.every((item) => selectedProductRecordIds.has(item.recordId || item.asin));
+}
+
+function bindProductSelection() {
+  const checkAll = document.getElementById("products-check-all");
+  if (checkAll) {
+    checkAll.onchange = () => {
+      products.forEach((item) => {
+        const key = item.recordId || item.asin;
+        if (checkAll.checked) {
+          selectedProductRecordIds.add(key);
+        } else {
+          selectedProductRecordIds.delete(key);
+        }
+      });
+      renderProducts();
+    };
+  }
+  document.querySelectorAll("[data-product-select]").forEach((node) => {
+    node.onchange = () => {
+      const key = Number(node.getAttribute("data-product-select")) || node.getAttribute("data-product-select");
+      if (node.checked) {
+        selectedProductRecordIds.add(key);
+      } else {
+        selectedProductRecordIds.delete(key);
+      }
+    };
+  });
 }
 
 function getProductSortValue(item, key) {
@@ -1239,8 +1275,12 @@ function applyInitialPageFilters() {
   const page = document.body.dataset.page;
   if (page === "products") {
     const period = params.get("period");
+    const prefillSearch = params.get("q");
     if (period && document.getElementById("products-period-filter")) {
       document.getElementById("products-period-filter").value = period;
+    }
+    if (prefillSearch && document.getElementById("products-search-input")) {
+      document.getElementById("products-search-input").value = prefillSearch;
     }
   }
   if (page === "reviews") {
@@ -1255,6 +1295,24 @@ function applyInitialPageFilters() {
     }
     if (view) {
       reviewViewMode = view;
+    }
+  }
+  if (page === "comparison") {
+    const mode = params.get("mode");
+    const input = params.get("input");
+    const scope = params.get("scope");
+    const period = params.get("period");
+    if (mode && document.getElementById("comparison-mode")) {
+      document.getElementById("comparison-mode").value = mode;
+    }
+    if (input && document.getElementById("comparison-input")) {
+      document.getElementById("comparison-input").value = input;
+    }
+    if (scope !== null && document.getElementById("comparison-scope")) {
+      document.getElementById("comparison-scope").value = scope;
+    }
+    if (period && document.getElementById("comparison-period")) {
+      document.getElementById("comparison-period").value = period;
     }
   }
 }
@@ -1292,6 +1350,7 @@ function bindCrudActions() {
   bindStoreImport();
   bindReportActions();
   bindLogout();
+  bindProductActions();
 }
 
 function bindDashboardWidgets() {
@@ -1306,6 +1365,35 @@ function bindDashboardWidgets() {
   document.getElementById("dashboard-news-next")?.addEventListener("click", () => {
     dashboardNewsPage += 1;
     renderDashboardNews();
+  });
+}
+
+function bindProductActions() {
+  document.getElementById("toggle-product-columns-top")?.addEventListener("click", () => {
+    document.getElementById("toggle-product-columns")?.click();
+  });
+  document.getElementById("products-export-button")?.addEventListener("click", () => {
+    const headers = productColumns.filter((column) => column.visible).map((column) => column.label);
+    const rows = products.map((item) => productColumns.filter((column) => column.visible).map((column) => {
+      const text = renderProductCell(item, column.key).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+      return text;
+    }));
+    downloadCsv(`products-${Date.now()}.csv`, [headers, ...rows]);
+  });
+  document.getElementById("products-compare-button")?.addEventListener("click", () => {
+    const selectedItems = products.filter((item) => selectedProductRecordIds.has(item.recordId || item.asin));
+    if (!selectedItems.length) {
+      alert("请先勾选至少 1 个产品再进入对比。");
+      return;
+    }
+    const identifiers = selectedItems.map((item) => item.parentAsin && item.parentAsin !== "-" ? item.parentAsin : item.asin).filter(Boolean);
+    const allParent = selectedItems.every((item) => item.parentAsin && item.parentAsin !== "-");
+    const mode = allParent ? "parent" : "asin";
+    const params = new URLSearchParams();
+    params.set("mode", mode);
+    params.set("input", identifiers.join(","));
+    params.set("scope", selectedItems.some((item) => item.platform !== "Amazon") ? "all" : "");
+    window.location.href = `./comparison.html?${params.toString()}`;
   });
 }
 
@@ -1553,6 +1641,9 @@ async function hydrateProducts() {
     const platform = document.getElementById("products-platform-filter")?.value;
     const siteCode = document.getElementById("products-site-filter")?.value;
     const storeName = document.getElementById("products-store-filter")?.value;
+    const buybox = document.getElementById("products-buybox-filter")?.value || "";
+    const rectify = document.getElementById("products-rectify-filter")?.value || "";
+    const risk = document.getElementById("products-risk-filter")?.value || "";
     if (platform) params.set("platform", platform);
     if (siteCode) params.set("site_code", siteCode);
     if (storeName) params.set("store_name", storeName);
@@ -1562,12 +1653,25 @@ async function hydrateProducts() {
       .map(mapProductFromApi)
       .filter((item) => !platform || item.platform === platform)
       .filter((item) => !siteCode || reverseLocalizeSite(item.site) === siteCode)
-      .filter((item) => !storeName || item.store === storeName);
+      .filter((item) => !storeName || item.store === storeName)
+      .filter((item) => !buybox || item.buybox === buybox)
+      .filter((item) => !rectify || item.rectify === rectify)
+      .filter((item) => !risk || matchesProductRisk(item, risk));
     renderProducts();
     if (document.body.dataset.page === "dashboard") renderDashboard();
   } catch (error) {
     console.warn("Products API unavailable, fallback to mock data", error);
   }
+}
+
+function matchesProductRisk(item, risk) {
+  const rating = Number(item.rating || 0);
+  const buyboxRisk = item.buybox === "异常";
+  const rectifyRisk = ["待反馈", "处理中"].includes(item.rectify);
+  if (risk === "high") return rating > 0 && rating < 3.8 || buyboxRisk;
+  if (risk === "medium") return rectifyRisk || (rating >= 3.8 && rating < 4.2);
+  if (risk === "low") return rating >= 4.2 && item.buybox === "正常";
+  return true;
 }
 
 async function hydrateReviews() {
@@ -1792,6 +1896,7 @@ function renderUrlCaptureResult(item) {
   const table = document.getElementById("url-capture-table");
   if (!table || !item) return;
   const price = item.price_amount ? `${item.price_currency || ""} ${item.price_amount}`.trim() : "-";
+  const statusMeta = captureStatusMeta(item.capture_status, item.capture_note);
   table.innerHTML = `
     <tr>
       <td>${escapeHtml(item.platform || "-")}</td>
@@ -1801,10 +1906,20 @@ function renderUrlCaptureResult(item) {
       <td>${escapeHtml(price)}</td>
       <td>${escapeHtml(item.rating ?? "-")}</td>
       <td>${escapeHtml(item.review_count ?? "-")}</td>
-      <td><span class="status ${statusClass(item.capture_status === "ok" ? "正常监控" : "待补数据")}">${escapeHtml(item.capture_status || "-")}</span></td>
-      <td>${escapeHtml(item.capture_note || "-")}</td>
+      <td><span class="status ${statusMeta.statusClass}">${escapeHtml(statusMeta.label)}</span></td>
+      <td>${escapeHtml(statusMeta.note)}</td>
     </tr>
   `;
+}
+
+function captureStatusMeta(status, note) {
+  if (status === "ok") {
+    return { label: "公开页已识别", note: note || "标题、链接等字段已抓取，可直接写入产品库。", statusClass: "success" };
+  }
+  if (status === "partial") {
+    return { label: "部分字段待补", note: note || "公开页只拿到部分字段，建议结合导出表补全。", statusClass: "warn" };
+  }
+  return { label: "公开页受限", note: note || "当前环境无法稳定读取公开页，建议用导出表或手工补录。", statusClass: "danger" };
 }
 
 function bindUrlCaptureActions() {
@@ -3311,7 +3426,7 @@ function filterReviewsLocally(items, isGrouped) {
 
 function matchesPeriod(timestamp, period) {
   if (!timestamp || Number.isNaN(timestamp)) return true;
-  const dayMap = { "30d": 30, "60d": 60, "90d": 90, "180d": 180 };
+  const dayMap = { "30d": 30, "60d": 60, "90d": 90, "180d": 180, "365d": 365, "1095d": 1095 };
   const days = dayMap[period];
   if (!days) return true;
   const diffMs = Date.now() - timestamp;
@@ -3356,6 +3471,7 @@ function mapProductFromApi(item) {
     supplier: item.supplier_name || item.supplier_factory || "-",
     launchDate: item.launch_date || "-",
     rectify: item.status || "待补",
+    updatedAt: item.updated_at || "",
   };
 }
 

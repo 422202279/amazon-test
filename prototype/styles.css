@@ -1343,6 +1343,11 @@ tbody tr:hover {
   top: 0;
 }
 
+.table-check {
+  width: 18px;
+  height: 18px;
+}
+
 .editor-modal-actions {
   position: sticky;
   bottom: 0;

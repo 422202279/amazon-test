@@ -37,8 +37,9 @@
             <p>一行一个产品，聚合店铺、销量、评分、购物车和整改状态</p>
           </div>
           <div class="topbar-actions">
-            <button class="button ghost">字段配置</button>
-            <button class="button ghost">导出 Excel</button>
+            <button class="button ghost" id="toggle-product-columns-top">字段配置</button>
+            <button class="button ghost" id="products-export-button">导出 Excel</button>
+            <button class="button ghost" id="products-compare-button">批量进入对比</button>
             <button class="button ghost" id="products-bootstrap-button">导入本地真实数据</button>
             <button class="button primary" id="products-create-button">新增产品</button>
           </div>
@@ -59,15 +60,15 @@
           </div>
           <div class="filter-row">
             <label>购物车</label>
-            <select><option>全部</option><option>正常</option><option>已丢失</option></select>
+            <select id="products-buybox-filter"><option value="">全部</option><option value="正常">正常</option><option value="异常">已丢失</option><option value="待补">待补</option></select>
           </div>
           <div class="filter-row">
             <label>整改状态</label>
-            <select><option>全部</option><option>待反馈</option><option>处理中</option><option>观察中</option></select>
+            <select id="products-rectify-filter"><option value="">全部</option><option value="待反馈">待反馈</option><option value="处理中">处理中</option><option value="观察中">观察中</option><option value="已整改">已整改</option></select>
           </div>
           <div class="filter-row">
             <label>差评风险</label>
-            <select><option>全部</option><option>高风险</option><option>中风险</option></select>
+            <select id="products-risk-filter"><option value="">全部</option><option value="high">高风险</option><option value="medium">中风险</option><option value="low">低风险</option></select>
           </div>
           <div class="filter-row">
             <label>统计周期</label>
