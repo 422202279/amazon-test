@@ -564,7 +564,7 @@ function renderProductCell(item, key) {
       <div class="product-cell">
         <span class="thumb ${item.tone}"></span>
         <div>
-          <span class="cell-title">${item.name}</span>
+          <span class="cell-title">${item.productUrl ? `<a class="link-inline" href="${item.productUrl}" target="_blank" rel="noreferrer">${item.name}</a>` : item.name}</span>
           <span class="cell-sub">${item.asin} · ${item.sku}</span>
         </div>
       </div>
@@ -952,6 +952,10 @@ function renderComparison() {
   });
 
   const notes = document.getElementById("comparison-notes");
+  const pool = document.getElementById("comparison-pool-chips");
+  if (pool) {
+    pool.innerHTML = buildComparisonPoolChips();
+  }
   if (notes) {
     notes.textContent = comparisonViewMode === "sales"
       ? `${periodLabel}视图：销量 / 销售额 / 评分 / 差评占比联动对比`
@@ -959,6 +963,19 @@ function renderComparison() {
         ? `${periodLabel}视图：评论总量 / 带图评论 / 差评占比 / 问题分布`
         : `${periodLabel}视图：综合判断按销量、评分、差评占比和建议动作汇总`;
   }
+}
+
+function buildComparisonPoolChips() {
+  const mode = document.getElementById("comparison-mode")?.value || "parent";
+  const raw = document.getElementById("comparison-input")?.value?.trim() || "";
+  const terms = splitTerms(raw);
+  const scoped = document.getElementById("comparison-scope")?.selectedOptions?.[0]?.textContent || "全部店铺";
+  const chips = terms.map((term) => {
+    const label = mode === "parent" ? `Parent ASIN: ${term}` : mode === "sku" ? `SKU: ${term}` : `ASIN: ${term}`;
+    return `<span class="chip neutral">${escapeHtml(label)}</span>`;
+  });
+  chips.push(`<span class="chip warn">当前范围：${escapeHtml(scoped)} · 已匹配 ${comparisonData.length} 个店铺样本</span>`);
+  return chips.join("");
 }
 
 function getComparisonSortValue(item, key) {
@@ -996,6 +1013,48 @@ function exportComparisonTable() {
 function renderDetail() {
   const feed = document.getElementById("detail-review-feed");
   if (!feed) return;
+  const detailProduct = getCurrentDetailProduct();
+  const openLinkButton = document.getElementById("detail-open-product-link");
+  const compareButton = document.getElementById("detail-create-comparison");
+  if (detailProduct && document.body.dataset.page === "product-detail") {
+    const titleNode = document.querySelector(".topbar h1");
+    const descNode = document.querySelector(".topbar p");
+    const cardTitle = document.querySelector(".product-card-large h2");
+    const detailGrid = document.querySelector(".detail-grid");
+    if (titleNode) titleNode.textContent = "产品详情";
+    if (descNode) descNode.textContent = `ASIN: ${detailProduct.asin} · ${detailProduct.name} · ${detailProduct.store}`;
+    if (cardTitle) cardTitle.textContent = detailProduct.name;
+    if (detailGrid) {
+      const metrics = detailGrid.querySelectorAll("strong");
+      if (metrics[0]) metrics[0].textContent = detailProduct.store;
+      if (metrics[1]) metrics[1].textContent = detailProduct.site;
+      if (metrics[2]) metrics[2].textContent = detailProduct.price;
+      if (metrics[3]) metrics[3].textContent = detailProduct.variantCount;
+      if (metrics[4]) metrics[4].textContent = detailProduct.parentAsin;
+      if (metrics[5]) metrics[5].textContent = detailProduct.keywords;
+    }
+  }
+  if (openLinkButton) {
+    openLinkButton.onclick = () => {
+      const link = detailProduct?.productUrl;
+      if (link) {
+        window.open(link, "_blank", "noopener,noreferrer");
+      } else {
+        alert("当前产品还没有可用的产品链接。");
+      }
+    };
+  }
+  if (compareButton) {
+    compareButton.onclick = () => {
+      if (!detailProduct) return;
+      const params = new URLSearchParams({
+        mode: detailProduct.parentAsin && detailProduct.parentAsin !== "-" ? "parent" : "asin",
+        input: detailProduct.parentAsin && detailProduct.parentAsin !== "-" ? detailProduct.parentAsin : detailProduct.asin,
+        scope: detailProduct.platform !== "Amazon" ? "all" : "",
+      });
+      window.location.href = `./comparison.html?${params.toString()}`;
+    };
+  }
   feed.innerHTML = reviews.slice(0, 4).map((review) => `
     <article class="review-card">
       <div class="review-card-head">
@@ -1007,6 +1066,15 @@ function renderDetail() {
       <div>${renderReviewMedia(review)}</div>
     </article>
   `).join("");
+}
+
+function getCurrentDetailProduct() {
+  const params = new URLSearchParams(window.location.search);
+  const asin = params.get("asin");
+  if (asin) {
+    return products.find((item) => item.asin === asin) || null;
+  }
+  return products[0] || null;
 }
 
 function renderTasks() {
@@ -1577,6 +1645,7 @@ async function hydrateLiveData() {
   if (page === "products") await hydrateProducts();
   if (page === "reviews") await hydrateReviews();
   if (page === "comparison") await hydrateComparison();
+  if (page === "product-detail") await hydrateProducts();
   if (page === "supplier-tasks") await hydrateTasks();
   if (page === "reports") await hydrateReports();
 }
