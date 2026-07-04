@@ -22,7 +22,7 @@ from app.routers.admin import (
     update_user,
 )
 from app.routers.auth import LoginPayload, login, me
-from app.routers.ops import create_backup, deployment_profile, list_backups, live_validation, source_capabilities
+from app.routers.ops import create_backup, deployment_profile, list_backups, live_validation, restore_backup, source_capabilities
 from app.security import ensure_default_admin
 
 
@@ -148,6 +148,24 @@ class OpsAdminTests(unittest.TestCase):
 
         self.assertTrue(created["created"])
         self.assertGreaterEqual(len(listed["items"]), 1)
+
+    def test_restore_backup_replaces_sqlite_file(self):
+        with self.session_factory() as db:
+            ensure_default_admin(db)
+            admin_user = db.query(UserAccount).filter(UserAccount.email == "admin@cb-monitor.local").one()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = Path(tmp_dir) / "test.sqlite3"
+            backup_dir = Path(tmp_dir) / "backups"
+            backup_dir.mkdir(parents=True, exist_ok=True)
+            db_path.write_text("old-db", encoding="utf-8")
+            (backup_dir / "demo.sqlite3").write_text("new-db", encoding="utf-8")
+
+            with patch.object(settings, "database_url", f"sqlite:///./{db_path}"), patch.object(settings, "backup_dir", backup_dir):
+                restored = restore_backup("demo.sqlite3", _=admin_user)
+
+            self.assertTrue(restored["restored"])
+            self.assertEqual(db_path.read_text(encoding="utf-8"), "new-db")
 
 
 if __name__ == "__main__":

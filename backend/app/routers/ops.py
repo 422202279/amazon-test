@@ -228,3 +228,16 @@ def create_backup(_: UserAccount = Depends(get_current_user)):
     target = settings.backup_dir / f"crossborder_monitor_{datetime.now().strftime('%Y%m%d_%H%M%S')}.sqlite3"
     shutil.copy2(db_path, target)
     return {"created": True, "file": str(target), "size_bytes": target.stat().st_size}
+
+
+@router.post("/backups/restore")
+def restore_backup(filename: str, _: UserAccount = Depends(get_current_user)):
+    db_path = _sqlite_db_path()
+    if not db_path:
+        return {"restored": False, "message": "当前数据库不是 SQLite，暂不支持此恢复方式。"}
+    backup_file = settings.backup_dir / filename
+    if not backup_file.exists():
+        return {"restored": False, "message": "备份文件不存在。"}
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(backup_file, db_path)
+    return {"restored": True, "file": str(backup_file), "database_path": str(db_path)}

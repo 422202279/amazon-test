@@ -41,6 +41,7 @@
 - `GET /api/ops/live-validation`
 - `GET /api/ops/backups`
 - `POST /api/ops/backups/create`
+- `POST /api/ops/backups/restore`
 - `GET /api/admin/users`
 - `GET /api/admin/roles`
 - `GET /api/admin/security`
@@ -92,6 +93,11 @@ python main.py
   - 密码：`admin123456`
 - 一键启动后端：
   - `bash scripts/run_local_stack.sh`
+- 一键启动本地演示前后端：
+  - `bash scripts/start_local_demo.sh`
+  - 打开：`http://127.0.0.1:4173/login.html`
+- 停止本地演示：
+  - `bash scripts/stop_local_demo.sh`
 - 后端启动后，一键跑本地全流程冒烟：
   - `python3 scripts/local_smoke_test.py`
 - 部署后健康检查：

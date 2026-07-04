@@ -80,3 +80,4 @@
 1. 跑健康检查：`python3 scripts/deploy_self_check.py`
 2. 跑业务冒烟：`python3 scripts/local_smoke_test.py`
 3. 创建首个数据库备份
+4. 如误操作，可用备份恢复 SQLite 主库
