@@ -13,6 +13,8 @@ const stores = [
 const API_BASE = "http://127.0.0.1:8000/api";
 const AUTH_TOKEN_KEY = "cb-auth-token";
 const AUTH_USER_KEY = "cb-auth-user";
+const ISSUE_TAXONOMY_KEY = "cb-issue-taxonomy-v1";
+const DEFAULT_ISSUE_TAXONOMY = ["待分类", "尺寸问题", "质量问题", "包装破损", "描述不符", "使用效果差", "掉色", "异味", "材质问题", "安装困难", "其他"];
 const siteLabelMap = {
   US: "美国",
   UK: "英国",
@@ -28,6 +30,20 @@ const reviewSortState = { key: "", direction: "desc" };
 const comparisonSortState = { key: "", direction: "desc" };
 let currentUser = null;
 let activeEditorSubmit = null;
+let issueTaxonomy = loadIssueTaxonomy();
+let dashboardNewsPage = 1;
+const dashboardNewsPageSize = 4;
+
+const dashboardNewsItems = [
+  { title: "亚马逊欧洲站包装与回收责任新要求", tag: "政策", summary: "关注法国、德国包装回收合规，涉及宠物类目包装标识与回收责任。", url: "https://sell.amazon.com" },
+  { title: "Amazon Review 展示逻辑与权重变化观察", tag: "平台", summary: "重点关注低星评论、带图评论和近30天新增评论对转化的影响。", url: "https://sellercentral.amazon.com" },
+  { title: "Coupang 店铺页商品展示节奏变化", tag: "韩国", summary: "韩国站建议继续以人工校验样本为主，避免把公开页当自动主链路。", url: "https://www.coupang.com" },
+  { title: "Naver Smart Store 宠物类目内容规范提醒", tag: "韩国", summary: "关注本地化标题、敏感词、配送承诺和评价展示差异。", url: "https://smartstore.naver.com" },
+  { title: "日本站夏季物流延迟与温控类商品风险", tag: "物流", summary: "夏季对宠物用品运输时效、包装耐热性和差评率波动影响较明显。", url: "https://www.amazon.co.jp" },
+  { title: "北美宠物用品差评高频词周观察", tag: "市场", summary: "质量、尺寸、异味、描述不符仍是最常见的四大类问题。", url: "https://www.amazon.com" },
+  { title: "加拿大站新上架宠物喂食器竞争观察", tag: "市场", summary: "自动喂食器类目竞争加快，需同时关注评分、BSR 和带图评论比例。", url: "https://www.amazon.ca" },
+  { title: "法国站近期 VAT 与包装义务提醒", tag: "政策", summary: "正式部署前建议把法国站数据源、价格币种和包装责任一并校验。", url: "https://www.amazon.fr" },
+];
 
 let products = [
   { tone: "tone-1", name: "记忆棉人体工学坐垫", asin: "B0DXSEAT01", parentAsin: "B0DXSEAT00", sku: "CUS-01-US", store: "US Home Store", site: "美国", platform: "Amazon", category: "Home & Kitchen", price: "$29.99", sales: 642, salesAmount: "$19,253", reviews: 1284, newReviews: 36, rating: 4.1, imageReviews: 93, variantCount: 4, keywords: "seat cushion / office cushion", bsr: "#1,248 / #13", dimensions: "45 x 35 x 7 cm / 1.1 kg", fulfillment: "FBA", sellerCount: 2, buybox: "异常", buyboxSeller: "BestHouse US", adFlags: "SP / 视频", contentFlags: "A+ / 品牌店铺", negative: "12 条", issue: "坐感塌陷 / 尺寸偏小", supplier: "宁波舒垫工厂", launchDate: "2026-03-12", rectify: "处理中" },
@@ -303,10 +319,12 @@ function renderDashboard() {
     </tr>
   `).join("");
 
-  reviewFeed.innerHTML = reviews.slice(0, 4).map((review) => `
+  const prioritizedReviews = prioritizeDashboardReviews(reviews).slice(0, 8);
+  reviewFeed.innerHTML = prioritizedReviews.map((review, index) => `
     <article class="review-card">
       <div class="review-card-head">
         <span class="stars">${starString(review.stars)}</span>
+        ${index < 3 && review.stars <= 3 ? '<span class="chip danger">今日优先</span>' : ""}
         <span class="chip ${review.stars <= 2 ? "danger" : review.stars === 3 ? "warn" : "success"}">${review.title}</span>
         <span class="chip neutral">${review.store}</span>
         <span class="chip neutral">${review.issue}</span>
@@ -330,20 +348,76 @@ function renderDashboard() {
     </div>
   `).join("");
 
-  const topIssues = [
-    ["质量问题", 38],
-    ["尺寸问题", 27],
-    ["描述不符", 19],
-    ["异味", 14],
-    ["包装破损", 11]
-  ];
+  const topIssues = calculateTopIssues(reviews);
+  const maxIssueValue = Math.max(...topIssues.map(([, value]) => value), 1);
   issues.innerHTML = topIssues.map(([name, value]) => `
     <div class="bar-row">
       <span>${name}</span>
-      <div><i style="width:${value * 2}%"></i></div>
+      <div><i style="width:${Math.max(12, Math.round((value / maxIssueValue) * 100))}%"></i></div>
       <strong>${value}</strong>
     </div>
   `).join("");
+  renderDashboardNews();
+}
+
+function prioritizeDashboardReviews(items) {
+  return items
+    .slice()
+    .sort((left, right) => {
+      const leftNegative = left.stars <= 3 ? 1 : 0;
+      const rightNegative = right.stars <= 3 ? 1 : 0;
+      if (leftNegative !== rightNegative) return rightNegative - leftNegative;
+      const leftMedia = left.hasImage ? 1 : 0;
+      const rightMedia = right.hasImage ? 1 : 0;
+      if (leftMedia !== rightMedia) return rightMedia - leftMedia;
+      const leftStars = Number(left.stars || 0);
+      const rightStars = Number(right.stars || 0);
+      if (leftStars !== rightStars) return leftStars - rightStars;
+      const leftTime = Date.parse(left.reviewedAt || "") || 0;
+      const rightTime = Date.parse(right.reviewedAt || "") || 0;
+      return rightTime - leftTime;
+    });
+}
+
+function calculateTopIssues(items) {
+  const counter = new Map();
+  items.forEach((item) => {
+    const key = item.issue || "待分类";
+    counter.set(key, (counter.get(key) || 0) + 1);
+  });
+  const ranked = [...counter.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+  return ranked.length ? ranked : issueTaxonomy.slice(1, 6).map((name, index) => [name, 12 - index * 2]);
+}
+
+function renderDashboardNews() {
+  const list = document.getElementById("dashboard-news-list");
+  const pageLabel = document.getElementById("dashboard-news-page");
+  const prevButton = document.getElementById("dashboard-news-prev");
+  const nextButton = document.getElementById("dashboard-news-next");
+  const search = (document.getElementById("dashboard-news-search")?.value || "").trim().toLowerCase();
+  if (!list || !pageLabel || !prevButton || !nextButton) return;
+  const filtered = dashboardNewsItems.filter((item) => {
+    if (!search) return true;
+    return [item.title, item.tag, item.summary].some((value) => String(value || "").toLowerCase().includes(search));
+  });
+  const totalPages = Math.max(1, Math.ceil(filtered.length / dashboardNewsPageSize));
+  dashboardNewsPage = Math.min(dashboardNewsPage, totalPages);
+  dashboardNewsPage = Math.max(1, dashboardNewsPage);
+  const pageItems = filtered.slice((dashboardNewsPage - 1) * dashboardNewsPageSize, dashboardNewsPage * dashboardNewsPageSize);
+  list.innerHTML = pageItems.map((item) => `
+    <li>
+      <div>
+        <a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">${escapeHtml(item.title)}</a>
+        <p>${escapeHtml(item.summary)}</p>
+      </div>
+      <span>${escapeHtml(item.tag)}</span>
+    </li>
+  `).join("") || '<li><div><strong>暂无匹配资讯</strong><p>可以换个关键词继续检索。</p></div><span>空</span></li>';
+  pageLabel.textContent = `第 ${dashboardNewsPage} / ${totalPages} 页`;
+  prevButton.disabled = dashboardNewsPage <= 1;
+  nextButton.disabled = dashboardNewsPage >= totalPages;
 }
 
 function renderStores() {
@@ -1079,6 +1153,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderTasks();
   renderReports();
   renderAccountManagement();
+  renderIssueTaxonomyManager();
+  renderIssueFilterOptions();
   await hydrateLiveData();
   await hydrateScheduleSettings();
   await hydrateOpsInsights();
@@ -1092,6 +1168,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   bindComparisonSubmit();
   bindManualRefresh();
   bindCrudActions();
+  bindDashboardWidgets();
+  bindIssueTaxonomyManager();
 });
 
 function applyInitialPageFilters() {
@@ -1152,6 +1230,21 @@ function bindCrudActions() {
   bindStoreImport();
   bindReportActions();
   bindLogout();
+}
+
+function bindDashboardWidgets() {
+  document.getElementById("dashboard-news-search")?.addEventListener("input", () => {
+    dashboardNewsPage = 1;
+    renderDashboardNews();
+  });
+  document.getElementById("dashboard-news-prev")?.addEventListener("click", () => {
+    dashboardNewsPage -= 1;
+    renderDashboardNews();
+  });
+  document.getElementById("dashboard-news-next")?.addEventListener("click", () => {
+    dashboardNewsPage += 1;
+    renderDashboardNews();
+  });
 }
 
 function bindStoreFilters() {
@@ -1260,6 +1353,11 @@ function bindManualRefresh() {
 
 async function hydrateLiveData() {
   const page = document.body.dataset.page;
+  if (page === "dashboard") {
+    await hydrateProducts();
+    await hydrateReviews();
+    await hydrateTasks();
+  }
   if (page === "stores") await hydrateStores();
   if (page === "products") await hydrateProducts();
   if (page === "reviews") await hydrateReviews();
@@ -1331,6 +1429,7 @@ async function hydrateProducts() {
     if (!data.items?.length) return;
     products = data.items.map(mapProductFromApi);
     renderProducts();
+    if (document.body.dataset.page === "dashboard") renderDashboard();
   } catch (error) {
     console.warn("Products API unavailable, fallback to mock data", error);
   }
@@ -1356,6 +1455,7 @@ async function hydrateReviews() {
     }
     reviews = filterReviewsLocally(reviews, mode === "product");
     renderReviews();
+    if (document.body.dataset.page === "dashboard") renderDashboard();
   } catch (error) {
     console.warn("Reviews API unavailable, fallback to mock data", error);
   }
@@ -1400,6 +1500,7 @@ async function hydrateTasks() {
     if (!data.items?.length) return;
     tasks.splice(0, tasks.length, ...data.items.map(mapTaskFromApi));
     renderTasks();
+    if (document.body.dataset.page === "dashboard") renderDashboard();
   } catch (error) {
     console.warn("Supplier tasks API unavailable, fallback to mock data", error);
   }
@@ -1607,9 +1708,9 @@ function bindGenerateTasks() {
   if (!button) return;
   button.addEventListener("click", async () => {
     try {
-      await fetchJson("/supplier-tasks/generate-from-reviews?limit=100", { method: "POST" });
+      const result = await fetchJson("/supplier-tasks/generate-from-reviews?limit=100", { method: "POST" });
       await hydrateTasks();
-      alert("已根据差评生成或补充整改任务。");
+      alert(`整改任务已处理完成。\n新建：${result.created || 0} 条\n补全：${result.updated || 0} 条\n可继续到整改任务页确认和补充。`);
     } catch (error) {
       alert(`生成失败：${error.message}`);
     }
@@ -1745,7 +1846,12 @@ function ensureEditorModal() {
   document.getElementById("editor-modal-close")?.addEventListener("click", closeEditorModal);
   document.getElementById("editor-modal-cancel")?.addEventListener("click", closeEditorModal);
   document.getElementById("editor-modal-save")?.addEventListener("click", async () => {
-    if (activeEditorSubmit) await activeEditorSubmit();
+    if (!activeEditorSubmit) return;
+    try {
+      await activeEditorSubmit();
+    } catch (error) {
+      console.warn("editor submit blocked", error);
+    }
   });
   return modal;
 }
@@ -1757,7 +1863,7 @@ function closeEditorModal() {
   activeEditorSubmit = null;
 }
 
-function openEditorModal({ title, subtitle, fields, values, onSubmit }) {
+function openEditorModal({ title, subtitle, fields, values, onSubmit, onReady }) {
   const modal = ensureEditorModal();
   const titleNode = document.getElementById("editor-modal-title");
   const subtitleNode = document.getElementById("editor-modal-subtitle");
@@ -1772,22 +1878,52 @@ function openEditorModal({ title, subtitle, fields, values, onSubmit }) {
     closeEditorModal();
   };
   modal.classList.add("open");
+  if (onReady) onReady(form, fields, values);
 }
 
 function renderEditorField(field, value) {
-  const fullClass = field.full ? "full" : "";
+  if (field.type === "section") {
+    return `<div class="section"><strong>${escapeHtml(field.label)}</strong><p>${escapeHtml(field.hint || "")}</p></div>`;
+  }
+  const classes = [field.full ? "full" : "", field.triple ? "triple" : "", field.required ? "required" : "", field.disabled ? "disabled" : ""].filter(Boolean).join(" ");
+  const hint = field.hint ? `<small class="field-hint">${escapeHtml(field.hint)}</small>` : "";
+  const datalist = field.datalist ? `<datalist id="${escapeHtml(field.datalist)}">${(field.options || []).map((option) => `<option value="${escapeHtml(option.value ?? option)}"></option>`).join("")}</datalist>` : "";
   if (field.type === "textarea") {
-    return `<label class="${fullClass}"><span>${field.label}</span><textarea data-editor-key="${field.key}">${escapeHtml(value ?? "")}</textarea></label>`;
+    return `<label class="${classes}"><span>${field.label}</span><textarea data-editor-key="${field.key}" ${field.required ? "required" : ""} ${field.disabled ? "disabled" : ""}>${escapeHtml(value ?? "")}</textarea>${hint}</label>`;
   }
   if (field.type === "select") {
-    return `<label class="${fullClass}"><span>${field.label}</span><select data-editor-key="${field.key}">${(field.options || []).map((option) => `<option value="${escapeHtml(option.value)}"${String(value ?? "") === String(option.value) ? " selected" : ""}>${escapeHtml(option.label)}</option>`).join("")}</select></label>`;
+    return `<label class="${classes}"><span>${field.label}</span><select data-editor-key="${field.key}" ${field.required ? "required" : ""} ${field.disabled ? "disabled" : ""}>${(field.options || []).map((option) => `<option value="${escapeHtml(option.value)}"${String(value ?? "") === String(option.value) ? " selected" : ""}>${escapeHtml(option.label)}</option>`).join("")}</select>${hint}</label>`;
   }
-  return `<label class="${fullClass}"><span>${field.label}</span><input data-editor-key="${field.key}" type="${field.type || "text"}" value="${escapeHtml(value ?? "")}" /></label>`;
+  if (field.type === "dimension") {
+    const parsed = parseDimensionInput(value || "");
+    return `<label class="${classes}"><span>${field.label}</span><div class="editor-grid-inline"><input data-editor-key="${field.key}_length" type="number" step="0.01" placeholder="长" value="${escapeHtml(parsed.length || "")}" /><input data-editor-key="${field.key}_width" type="number" step="0.01" placeholder="宽" value="${escapeHtml(parsed.width || "")}" /><input data-editor-key="${field.key}_height" type="number" step="0.01" placeholder="高" value="${escapeHtml(parsed.height || "")}" /></div>${hint}</label>`;
+  }
+  if (field.type === "weight") {
+    const parsed = parseWeightInput(value || "");
+    return `<label class="${classes}"><span>${field.label}</span><div class="editor-grid-inline"><input data-editor-key="${field.key}_value" type="number" step="0.01" placeholder="重量数值" value="${escapeHtml(parsed.value || "")}" /><select data-editor-key="${field.key}_unit"><option value="kg"${parsed.unit === "kg" ? " selected" : ""}>kg</option><option value="g"${parsed.unit === "g" ? " selected" : ""}>g</option></select><input data-editor-key="${field.key}_preview" type="text" value="${escapeHtml(parsed.preview || "")}" disabled /></div>${hint}</label>`;
+  }
+  return `<label class="${classes}"><span>${field.label}</span><input data-editor-key="${field.key}" list="${escapeHtml(field.datalist || "")}" type="${field.type || "text"}" value="${escapeHtml(value ?? "")}" ${field.required ? "required" : ""} ${field.disabled ? "disabled" : ""} ${field.readonly ? "readonly" : ""} />${datalist}${hint}</label>`;
 }
 
 function collectEditorFormData(fields) {
   const result = {};
   fields.forEach((field) => {
+    if (field.type === "section") return;
+    if (field.type === "dimension") {
+      result[field.key] = formatDimensionInput({
+        length: document.querySelector(`[data-editor-key="${field.key}_length"]`)?.value || "",
+        width: document.querySelector(`[data-editor-key="${field.key}_width"]`)?.value || "",
+        height: document.querySelector(`[data-editor-key="${field.key}_height"]`)?.value || "",
+      });
+      return;
+    }
+    if (field.type === "weight") {
+      result[field.key] = formatWeightInput({
+        value: document.querySelector(`[data-editor-key="${field.key}_value"]`)?.value || "",
+        unit: document.querySelector(`[data-editor-key="${field.key}_unit"]`)?.value || "kg",
+      });
+      return;
+    }
     const node = document.querySelector(`[data-editor-key="${field.key}"]`);
     result[field.key] = node?.value ?? "";
   });
@@ -1796,21 +1932,23 @@ function collectEditorFormData(fields) {
 
 function productEditorFields() {
   return [
-    { key: "title", label: "产品标题", full: true },
-    { key: "localized_title", label: "中文解释", full: true },
-    { key: "platform", label: "平台", type: "select", options: platformOptions() },
-    { key: "site_code", label: "站点", type: "select", options: siteOptions() },
-    { key: "store_name", label: "店铺名" },
-    { key: "asin", label: "ASIN" },
-    { key: "parent_asin", label: "父 ASIN" },
+    { type: "section", label: "基础信息", hint: "平台、站点、店铺、标题是主档基础字段；Amazon 手工新增时建议填写 ASIN。" },
+    { key: "title", label: "产品标题", full: true, required: true },
+    { key: "localized_title", label: "中文解释", full: true, hint: "可手动修改；留空时系统会自动给一个中文解释占位。" },
+    { key: "platform", label: "平台", type: "select", options: platformOptions(), required: true },
+    { key: "site_code", label: "站点", type: "select", options: siteOptions(), required: true },
+    { key: "store_name", label: "店铺名", required: true, datalist: "product-store-options", options: storeOptionValues() },
+    { key: "asin", label: "ASIN", hint: "Amazon 建议严格 10 位字母数字；韩国站可为空。" },
+    { key: "parent_asin", label: "父 ASIN", hint: "父子体可能相同，也可能为空。" },
     { key: "sku", label: "SKU" },
     { key: "department_item_no", label: "部门货号" },
-    { key: "brand", label: "品牌" },
+    { key: "brand", label: "品牌", hint: "若已有同店铺产品，会优先带出最近使用的品牌。" },
     { key: "category_name", label: "类目" },
-    { key: "product_url", label: "产品链接", full: true },
-    { key: "image_url", label: "主图链接", full: true },
+    { key: "product_url", label: "产品链接", full: true, hint: "若填了产品链接，后续可以优先尝试补主图和标题。" },
+    { key: "image_url", label: "主图链接", full: true, hint: "可先留空；后续优先通过产品链接自动补主图。" },
+    { type: "section", label: "经营数据", hint: "销量、评分、评论数一般以后端导入或同步结果为准，管理员也可临时修正。" },
     { key: "price_amount", label: "价格数字", type: "number" },
-    { key: "price_currency", label: "币种", type: "select", options: currencyOptions() },
+    { key: "price_currency", label: "币种", type: "select", options: currencyOptions(), disabled: true, hint: "按站点自动带出，不单独手选。" },
     { key: "monthly_sales", label: "近30天销量", type: "number" },
     { key: "monthly_revenue", label: "近30天销售额", type: "number" },
     { key: "review_count", label: "Review总数", type: "number" },
@@ -1818,12 +1956,13 @@ function productEditorFields() {
     { key: "variation_count", label: "变体数", type: "number" },
     { key: "seller_count", label: "跟卖卖家数", type: "number" },
     { key: "buybox_seller", label: "BuyBox卖家" },
-    { key: "fulfillment_type", label: "配送方式" },
-    { key: "size_text", label: "尺寸" },
-    { key: "weight_text", label: "重量" },
-    { key: "supplier_name", label: "供应商" },
-    { key: "supplier_factory", label: "工厂" },
-    { key: "status", label: "状态" },
+    { key: "fulfillment_type", label: "配送方式", type: "select", options: fulfillmentOptions() },
+    { type: "section", label: "规格与供应商", hint: "尺寸建议标准化成 cm，重量建议标准化成 kg 或 g；供应商优先复用已有名称。" },
+    { key: "size_text", label: "尺寸（cm）", type: "dimension", triple: true, hint: "系统会自动拼成“长 x 宽 x 高 cm”格式。" },
+    { key: "weight_text", label: "重量", type: "weight", triple: true, hint: "请明确 kg 或 g，避免只写数字造成歧义。" },
+    { key: "supplier_name", label: "供应商", datalist: "supplier-options", options: supplierOptionValues() },
+    { key: "supplier_factory", label: "工厂 / 生产方", hint: "若与供应商相同，可留空，保存时默认补成同名。" },
+    { key: "status", label: "状态", type: "select", options: productStatusOptions() },
   ];
 }
 
@@ -1858,7 +1997,13 @@ function openProductEditor(source = null) {
     subtitle: "可一次性修改整行字段；重新抓取时系统应按平台+站点+ASIN/链接优先更新同一条记录。",
     fields: productEditorFields(),
     values,
+    onReady: bindProductEditorInteractions,
     onSubmit: async (formData) => {
+      const validationMessage = validateProductForm(formData);
+      if (validationMessage) {
+        alert(validationMessage);
+        throw new Error(validationMessage);
+      }
       const payload = productPayloadFromForm(formData);
       try {
         if (source?.recordId) {
@@ -1908,7 +2053,7 @@ function buildProductEditorValues(source = null) {
     parent_asin: source.parentAsin === "-" ? "" : (source.parentAsin || ""),
     sku: source.sku === "-" ? "" : (source.sku || ""),
     department_item_no: "",
-    brand: "",
+    brand: inferBrandForStore(source.store, reverseLocalizeSite(source.site), source.platform),
     category_name: source.category === "-" ? "" : (source.category || ""),
     product_url: source.productUrl || "",
     image_url: "",
@@ -1922,8 +2067,8 @@ function buildProductEditorValues(source = null) {
     seller_count: source.sellerCount === "-" ? "" : (source.sellerCount || ""),
     buybox_seller: source.buyboxSeller === "-" ? "" : (source.buyboxSeller || ""),
     fulfillment_type: source.fulfillment === "-" ? "" : (source.fulfillment || ""),
-    size_text: source.dimensions === "-" ? "" : (source.dimensions || ""),
-    weight_text: source.dimensions === "-" ? "" : (source.dimensions || ""),
+    size_text: source.dimensions === "-" ? "" : extractSizeFromDimensions(source.dimensions || ""),
+    weight_text: source.dimensions === "-" ? "" : extractWeightFromDimensions(source.dimensions || ""),
     supplier_name: source.supplier === "-" ? "" : (source.supplier || ""),
     supplier_factory: source.supplier === "-" ? "" : (source.supplier || ""),
     status: source.rectify || "正常监控",
@@ -1937,7 +2082,7 @@ function buildProductEditorValues(source = null) {
     parent_asin: "",
     sku: "",
     department_item_no: "",
-    brand: "",
+    brand: inferBrandForStore("", "US", "Amazon"),
     category_name: "",
     product_url: "",
     image_url: "",
@@ -2004,6 +2149,7 @@ function buildReviewEditorValues(source = null) {
 }
 
 function productPayloadFromForm(data) {
+  const siteCurrency = currencyForSite(data.site_code);
   return {
     platform: data.platform,
     site_code: data.site_code,
@@ -2014,13 +2160,13 @@ function productPayloadFromForm(data) {
     parent_asin: data.parent_asin || "",
     title: data.title || "",
     localized_title: data.localized_title || "",
-    brand: data.brand || "",
+    brand: data.brand || inferBrandForStore(data.store_name, data.site_code, data.platform) || "",
     category_path: "",
     category_name: data.category_name || "",
     product_url: data.product_url || "",
     image_url: data.image_url || "",
     price_amount: data.price_amount ? Number(data.price_amount) : null,
-    price_currency: data.price_currency || "",
+    price_currency: siteCurrency || data.price_currency || "",
     monthly_sales: data.monthly_sales ? Number(data.monthly_sales) : null,
     monthly_revenue: data.monthly_revenue ? Number(data.monthly_revenue) : null,
     review_count: data.review_count ? Number(data.review_count) : null,
@@ -2040,7 +2186,7 @@ function productPayloadFromForm(data) {
     package_weight_text: "",
     package_size_text: "",
     supplier_name: data.supplier_name || "",
-    supplier_factory: data.supplier_factory || "",
+    supplier_factory: data.supplier_factory || data.supplier_name || "",
     status: data.status || "正常监控",
   };
 }
@@ -2108,13 +2254,25 @@ function currencyOptions() {
   ];
 }
 
+function productStatusOptions() {
+  return ["正常监控", "待补数据", "暂停"].map((value) => ({ value, label: value }));
+}
+
+function fulfillmentOptions() {
+  return [
+    { value: "", label: "待补" },
+    { value: "FBA", label: "FBA" },
+    { value: "FBM", label: "FBM" },
+    { value: "SFP", label: "SFP" },
+  ];
+}
+
 function starOptions() {
   return [1, 2, 3, 4, 5].map((value) => ({ value: String(value), label: `${value} 星` }));
 }
 
 function issueOptions() {
-  return ["待分类", "尺寸问题", "质量问题", "包装破损", "描述不符", "使用效果差", "掉色", "异味", "其他"]
-    .map((value) => ({ value, label: value }));
+  return issueTaxonomy.map((value) => ({ value, label: value }));
 }
 
 function sentimentOptions() {
@@ -2126,6 +2284,203 @@ function yesNoOptions() {
     { value: "no", label: "未反馈" },
     { value: "yes", label: "已反馈" },
   ];
+}
+
+function loadIssueTaxonomy() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(ISSUE_TAXONOMY_KEY) || "null");
+    if (Array.isArray(stored) && stored.length) return stored;
+  } catch (error) {
+    console.warn("loadIssueTaxonomy failed", error);
+  }
+  return DEFAULT_ISSUE_TAXONOMY.slice();
+}
+
+function saveIssueTaxonomy() {
+  localStorage.setItem(ISSUE_TAXONOMY_KEY, JSON.stringify(issueTaxonomy));
+}
+
+function renderIssueTaxonomyManager() {
+  const list = document.getElementById("issue-taxonomy-list");
+  if (!list) return;
+  list.innerHTML = issueTaxonomy.map((item) => `
+    <span class="taxonomy-pill">
+      <span>${escapeHtml(item)}</span>
+      ${DEFAULT_ISSUE_TAXONOMY.includes(item) ? "" : `<button type="button" data-issue-remove="${escapeHtml(item)}">×</button>`}
+    </span>
+  `).join("");
+}
+
+function renderIssueFilterOptions() {
+  const select = document.getElementById("reviews-issue-filter");
+  if (!select) return;
+  const current = select.value;
+  select.innerHTML = `<option value="">全部分类</option>${issueTaxonomy.filter((item) => item !== "待分类").map((item) => `<option value="${escapeHtml(item)}">${escapeHtml(item)}</option>`).join("")}`;
+  if (issueTaxonomy.includes(current)) select.value = current;
+}
+
+function bindIssueTaxonomyManager() {
+  const addButton = document.getElementById("issue-taxonomy-add");
+  const resetButton = document.getElementById("issue-taxonomy-reset");
+  const input = document.getElementById("issue-taxonomy-input");
+  if (addButton && input) {
+    addButton.onclick = () => {
+      const value = input.value.trim();
+      if (!value) return;
+      if (!issueTaxonomy.includes(value)) {
+        issueTaxonomy.push(value);
+        saveIssueTaxonomy();
+        renderIssueTaxonomyManager();
+        renderIssueFilterOptions();
+        renderDashboard();
+      }
+      input.value = "";
+      bindIssueTaxonomyManager();
+    };
+  }
+  if (resetButton) {
+    resetButton.onclick = () => {
+      issueTaxonomy = DEFAULT_ISSUE_TAXONOMY.slice();
+      saveIssueTaxonomy();
+      renderIssueTaxonomyManager();
+      renderIssueFilterOptions();
+      renderDashboard();
+      bindIssueTaxonomyManager();
+    };
+  }
+  document.querySelectorAll("[data-issue-remove]").forEach((button) => {
+    button.onclick = () => {
+      const value = button.getAttribute("data-issue-remove");
+      issueTaxonomy = issueTaxonomy.filter((item) => item !== value);
+      saveIssueTaxonomy();
+      renderIssueTaxonomyManager();
+      renderIssueFilterOptions();
+      renderDashboard();
+      bindIssueTaxonomyManager();
+    };
+  });
+}
+
+function storeOptionValues() {
+  return stores.map((item) => ({ value: item.name }));
+}
+
+function supplierOptionValues() {
+  const values = [
+    ...products.map((item) => item.supplier).filter(Boolean),
+    ...tasks.map((item) => item.supplier).filter(Boolean),
+  ].filter((item) => item && item !== "-");
+  return [...new Set(values)].sort((a, b) => a.localeCompare(b, "zh-CN")).map((value) => ({ value }));
+}
+
+function currencyForSite(siteCode) {
+  return { US: "USD", UK: "GBP", DE: "EUR", FR: "EUR", JP: "JPY", CA: "CAD", KR: "KRW" }[siteCode] || "";
+}
+
+function platformSites(platform) {
+  if (platform === "Amazon") return ["US", "UK", "DE", "JP", "CA", "FR"];
+  if (platform === "Coupang" || platform === "Naver") return ["KR"];
+  return ["US", "UK", "DE", "JP", "CA", "FR", "KR"];
+}
+
+function inferBrandForStore(storeName, siteCode, platform) {
+  const matched = products.find((item) => item.store === storeName && reverseLocalizeSite(item.site) === siteCode && item.platform === platform && item.brand);
+  return matched?.brand || "";
+}
+
+function parseDimensionInput(text) {
+  const values = String(text || "").match(/[\d.]+/g) || [];
+  return { length: values[0] || "", width: values[1] || "", height: values[2] || "" };
+}
+
+function formatDimensionInput({ length, width, height }) {
+  const values = [length, width, height].map((item) => String(item || "").trim()).filter(Boolean);
+  return values.length ? `${values.join(" x ")} cm` : "";
+}
+
+function parseWeightInput(text) {
+  const normalized = String(text || "").trim();
+  const value = normalized.match(/[\d.]+/)?.[0] || "";
+  const unit = /\bg\b/i.test(normalized) && !/\bkg\b/i.test(normalized) ? "g" : "kg";
+  return { value, unit, preview: value ? `${value} ${unit}` : "" };
+}
+
+function formatWeightInput({ value, unit }) {
+  const numeric = String(value || "").trim();
+  return numeric ? `${numeric} ${unit || "kg"}` : "";
+}
+
+function extractSizeFromDimensions(text) {
+  const parts = String(text || "").split("/").map((item) => item.trim());
+  return parts[0] || "";
+}
+
+function extractWeightFromDimensions(text) {
+  const parts = String(text || "").split("/").map((item) => item.trim());
+  return parts[1] || "";
+}
+
+function validateProductForm(data) {
+  if (!data.title?.trim()) return "产品标题为必填项。";
+  if (!data.platform?.trim()) return "平台为必填项。";
+  if (!data.site_code?.trim()) return "站点为必填项。";
+  if (!data.store_name?.trim()) return "店铺名为必填项。";
+  if (data.platform === "Amazon" && !/^[A-Z0-9]{10}$/i.test(String(data.asin || "").trim())) {
+    return "Amazon 产品请填写 10 位 ASIN。";
+  }
+  if (data.parent_asin && data.platform === "Amazon" && !/^[A-Z0-9]{10}$/i.test(String(data.parent_asin || "").trim())) {
+    return "父 ASIN 格式不正确，请检查是否为 10 位字母数字。";
+  }
+  if (!platformSites(data.platform).includes(data.site_code)) {
+    return "当前平台与站点组合不匹配，请重新选择。";
+  }
+  if (!String(data.product_url || "").trim() && data.platform !== "Amazon" && !String(data.asin || "").trim()) {
+    return "韩国站等非 Amazon 产品至少需要填写产品链接。";
+  }
+  return "";
+}
+
+function bindProductEditorInteractions() {
+  const platformNode = document.querySelector('[data-editor-key="platform"]');
+  const siteNode = document.querySelector('[data-editor-key="site_code"]');
+  const storeNode = document.querySelector('[data-editor-key="store_name"]');
+  const currencyNode = document.querySelector('[data-editor-key="price_currency"]');
+  const brandNode = document.querySelector('[data-editor-key="brand"]');
+  const weightValueNode = document.querySelector('[data-editor-key="weight_text_value"]');
+  const weightUnitNode = document.querySelector('[data-editor-key="weight_text_unit"]');
+  const weightPreviewNode = document.querySelector('[data-editor-key="weight_text_preview"]');
+  const sync = () => {
+    const platform = platformNode?.value || "Amazon";
+    const allowedSites = platformSites(platform);
+    if (siteNode) {
+      [...siteNode.options].forEach((option) => {
+        option.hidden = option.value ? !allowedSites.includes(option.value) : false;
+      });
+      if (!allowedSites.includes(siteNode.value)) siteNode.value = allowedSites[0] || "US";
+    }
+    if (currencyNode) currencyNode.value = currencyForSite(siteNode?.value || "US") || "USD";
+    if (storeNode) {
+      const matched = stores.filter((item) => item.platform === platform && reverseLocalizeSite(item.site) === (siteNode?.value || "US"));
+      storeNode.setAttribute("list", "product-store-options");
+      const datalist = document.getElementById("product-store-options");
+      if (datalist) {
+        datalist.innerHTML = matched.map((item) => `<option value="${escapeHtml(item.name)}"></option>`).join("");
+      }
+    }
+    if (brandNode && !brandNode.value.trim()) {
+      brandNode.value = inferBrandForStore(storeNode?.value || "", siteNode?.value || "US", platform) || "";
+    }
+  };
+  const syncWeightPreview = () => {
+    if (weightPreviewNode) weightPreviewNode.value = formatWeightInput({ value: weightValueNode?.value || "", unit: weightUnitNode?.value || "kg" });
+  };
+  platformNode?.addEventListener("change", sync);
+  siteNode?.addEventListener("change", sync);
+  storeNode?.addEventListener("change", sync);
+  weightValueNode?.addEventListener("input", syncWeightPreview);
+  weightUnitNode?.addEventListener("change", syncWeightPreview);
+  sync();
+  syncWeightPreview();
 }
 
 function bindTaskRowActions() {
@@ -2396,11 +2751,12 @@ function stripToNumeric(text) {
 }
 
 function detectCurrencySymbol(text) {
-  if (String(text).includes("£")) return "£";
-  if (String(text).includes("€")) return "€";
-  if (String(text).includes("¥")) return "¥";
-  if (String(text).toUpperCase().includes("CA$")) return "CA$";
-  return "$";
+  if (String(text).includes("£")) return "GBP";
+  if (String(text).includes("€")) return "EUR";
+  if (String(text).includes("¥")) return "JPY";
+  if (String(text).toUpperCase().includes("CA$")) return "CAD";
+  if (String(text).includes("₩")) return "KRW";
+  return "USD";
 }
 
 function mapTaskStatusToApi(label) {
@@ -2469,6 +2825,7 @@ function mapProductFromApi(item) {
     store: item.store_name || "未识别店铺",
     site: localizeSite(item.site_code),
     platform: item.platform || "-",
+    brand: item.brand || "",
     category: item.category_name || item.category_path || "-",
     productUrl: isExternalUrl(item.product_url) ? item.product_url : "",
     price: formatPriceWithCurrency(item.price_amount, item.price_currency),

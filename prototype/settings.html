@@ -107,6 +107,22 @@
           </div>
         </section>
 
+        <section class="panel" id="issue-taxonomy-panel">
+          <div class="panel-head">
+            <div>
+              <h2>问题分类管理</h2>
+              <p>Dashboard 的 TOP5、评论总表筛选、整改任务归因都共用这套分类；支持本地维护</p>
+            </div>
+            <span class="chip warn">本地可维护</span>
+          </div>
+          <div class="taxonomy-toolbar">
+            <input id="issue-taxonomy-input" type="text" placeholder="新增问题分类，例如：材质问题 / 安装困难" />
+            <button class="button primary" id="issue-taxonomy-add" type="button">新增分类</button>
+            <button class="button ghost" id="issue-taxonomy-reset" type="button">恢复默认</button>
+          </div>
+          <div class="taxonomy-list" id="issue-taxonomy-list"></div>
+        </section>
+
         <section class="two-col">
           <div class="panel">
             <div class="panel-head">

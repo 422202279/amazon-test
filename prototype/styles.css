@@ -586,6 +586,8 @@ tbody tr:hover {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  max-height: 560px;
+  overflow: auto;
 }
 
 .review-card {
@@ -731,6 +733,10 @@ tbody tr:hover {
   padding: 4px 18px 18px;
 }
 
+.news-list.rich {
+  min-height: 286px;
+}
+
 .news-list li {
   display: flex;
   justify-content: space-between;
@@ -738,6 +744,71 @@ tbody tr:hover {
   padding: 12px 0;
   border-bottom: 1px solid #edf2f7;
   font-size: 13px;
+}
+
+.news-list li a {
+  color: #17335c;
+  font-weight: 600;
+}
+
+.news-list li p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.news-toolbar,
+.taxonomy-toolbar {
+  display: flex;
+  gap: 10px;
+  padding: 0 18px 10px;
+}
+
+.news-toolbar input,
+.taxonomy-toolbar input {
+  flex: 1 1 auto;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fcfdff;
+}
+
+.pager-line,
+.panel-foot-note {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 0 18px 18px;
+}
+
+.taxonomy-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 0 18px 18px;
+}
+
+.taxonomy-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: #314257;
+}
+
+.taxonomy-pill button {
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 50%;
+  background: #eef3f9;
+  color: #51657d;
+  cursor: pointer;
 }
 
 .table-summary {
@@ -1170,8 +1241,45 @@ tbody tr:hover {
   color: #314257;
 }
 
+.editor-form-grid label.required span::after {
+  content: " *";
+  color: var(--red);
+}
+
+.editor-form-grid label.disabled {
+  opacity: 0.78;
+}
+
 .editor-form-grid .full {
   grid-column: 1 / -1;
+}
+
+.editor-form-grid .triple {
+  grid-column: 1 / -1;
+}
+
+.editor-form-grid .section {
+  grid-column: 1 / -1;
+  padding: 16px 0 0;
+  border-top: 1px solid #edf2f7;
+}
+
+.editor-form-grid .section strong {
+  font-size: 14px;
+}
+
+.editor-form-grid .section p,
+.field-hint {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.editor-grid-inline {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .editor-form-grid input,
