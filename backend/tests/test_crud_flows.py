@@ -8,6 +8,7 @@ from sqlalchemy.orm import sessionmaker
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.database import Base
+from app.routers.stores import StorePayload, create_store, delete_store, update_store
 from app.models.user_account import UserAccount
 from app.routers.products import ProductPayload, create_product, delete_product, update_product
 from app.routers.reviews import ReviewPayload, create_review, delete_review, update_review
@@ -49,6 +50,26 @@ class CrudFlowTests(unittest.TestCase):
 
         self.assertEqual(created["title"], "Test Product")
         self.assertEqual(updated["title"], "Updated Product")
+        self.assertTrue(deleted["ok"])
+
+    def test_store_crud_flow(self):
+        with self.session_factory() as db:
+            admin = self._admin(db)
+            created = create_store(
+                StorePayload(name="KR Pet Store", platform="Naver", site_code="KR", seller_identifier="petmoment-kr"),
+                db=db,
+                _=admin,
+            )
+            updated = update_store(
+                created["id"],
+                StorePayload(name="KR Pet Store Updated", platform="Naver", site_code="KR", seller_identifier="petmoment-kr"),
+                db=db,
+                _=admin,
+            )
+            deleted = delete_store(created["id"], db=db, _=admin)
+
+        self.assertEqual(created["name"], "KR Pet Store")
+        self.assertEqual(updated["name"], "KR Pet Store Updated")
         self.assertTrue(deleted["ok"])
 
     def test_review_crud_flow(self):

@@ -37,35 +37,34 @@
             <p>维护 Amazon / Coupang / Naver 多站点店铺信息，预留导入导出操作位</p>
           </div>
           <div class="topbar-actions">
-            <button class="button ghost">导入 Excel</button>
-            <button class="button primary">新增店铺</button>
+            <button class="button ghost" id="stores-import-button">导入店铺主档</button>
+            <button class="button primary" id="stores-create-button">新增店铺</button>
           </div>
         </header>
 
         <section class="filters">
           <div class="filter-row">
             <label>平台</label>
-            <select>
-              <option>全部平台</option>
-              <option>Amazon</option>
-              <option>Coupang</option>
-              <option>Naver</option>
+            <select id="stores-platform-filter">
+              <option value="">全部平台</option>
+              <option value="Amazon">Amazon</option>
+              <option value="Coupang">Coupang</option>
+              <option value="Naver">Naver</option>
             </select>
           </div>
           <div class="filter-row">
             <label>状态</label>
-            <select>
-              <option>全部状态</option>
-              <option>正常监控</option>
-              <option>待补数据</option>
-              <option>暂停</option>
+            <select id="stores-status-filter">
+              <option value="">全部状态</option>
+              <option value="active">启用</option>
+              <option value="paused">暂停</option>
             </select>
           </div>
           <div class="filter-row filter-search">
             <label>搜索</label>
-            <input type="text" placeholder="店铺名 / 国家 / Seller ID" />
+            <input id="stores-search-input" type="text" placeholder="店铺名 / 国家 / Seller ID" />
           </div>
-          <button class="button">筛选</button>
+          <button class="button" id="stores-apply-button">筛选</button>
         </section>
 
         <section class="panel">

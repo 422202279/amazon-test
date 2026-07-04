@@ -330,7 +330,7 @@ function renderStores() {
           <span class="thumb tone-${(index % 6) + 1}"></span>
           <div>
             <span class="cell-title">${store.name}</span>
-            <span class="cell-sub">负责人：运营-${index + 1}</span>
+            <span class="cell-sub">${store.storePageUrl ? `<a class="link-inline" href="${store.storePageUrl}" target="_blank" rel="noreferrer">店铺链接</a>` : `负责人：运营-${index + 1}`}</span>
           </div>
         </div>
       </td>
@@ -342,9 +342,10 @@ function renderStores() {
       <td>${store.rating}</td>
       <td><span class="status ${statusClass(store.status)}">${store.status}</span></td>
       <td>${store.sync}</td>
-      <td><a class="link-inline" href="#">查看</a> / <a class="link-inline" href="#">编辑</a></td>
+      <td>${renderRowActions("store", store.recordId)}</td>
     </tr>
   `).join("");
+  bindStoreRowActions();
 }
 
 function renderProducts() {
@@ -889,7 +890,7 @@ function renderReports() {
       <td>${report.range}</td>
       <td>${report.time}</td>
       <td><span class="status ${statusClass(report.status)}">${report.status}</span></td>
-      <td><a class="link-inline" href="#">Markdown</a> / <a class="link-inline" href="#">Excel</a></td>
+      <td>${report.recordId ? `<a class="link-inline" href="${API_BASE}/reports/${report.recordId}/markdown" target="_blank" rel="noreferrer">Markdown</a>` : '<a class="link-inline" href="#">Markdown</a>'} / <a class="link-inline" href="#">Excel</a></td>
     </tr>
   `).join("");
 }
@@ -1054,6 +1055,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   await hydrateScheduleSettings();
   await hydrateOpsInsights();
   await hydrateAdminData();
+  bindStoreFilters();
   bindProductFilters();
   bindReviewFilters();
   bindReviewViewSwitch();
@@ -1084,6 +1086,7 @@ function bindLoginForm() {
 }
 
 function bindCrudActions() {
+  bindStoreCreate();
   bindProductCreate();
   bindReviewCreate();
   bindTaskCreate();
@@ -1091,7 +1094,17 @@ function bindCrudActions() {
   bindBootstrapLocalData();
   bindUrlCaptureActions();
   bindGenerateTasks();
+  bindStoreImport();
+  bindReportActions();
   bindLogout();
+}
+
+function bindStoreFilters() {
+  const button = document.getElementById("stores-apply-button");
+  if (!button) return;
+  button.addEventListener("click", async () => {
+    await hydrateStores();
+  });
 }
 
 function bindReviewViewSwitch() {
@@ -1159,10 +1172,33 @@ function bindManualRefresh() {
 
 async function hydrateLiveData() {
   const page = document.body.dataset.page;
+  if (page === "stores") await hydrateStores();
   if (page === "products") await hydrateProducts();
   if (page === "reviews") await hydrateReviews();
   if (page === "comparison") await hydrateComparison();
   if (page === "supplier-tasks") await hydrateTasks();
+  if (page === "reports") await hydrateReports();
+}
+
+async function hydrateStores() {
+  try {
+    const data = await fetchJson("/stores");
+    if (!data.items?.length) return;
+    const platform = document.getElementById("stores-platform-filter")?.value || "";
+    const status = document.getElementById("stores-status-filter")?.value || "";
+    const search = (document.getElementById("stores-search-input")?.value || "").trim().toLowerCase();
+    stores = data.items
+      .map(mapStoreFromApi)
+      .filter((item) => !platform || item.platform === platform)
+      .filter((item) => !status || item.rawStatus === status)
+      .filter((item) => {
+        if (!search) return true;
+        return [item.name, item.site, item.seller].some((value) => String(value || "").toLowerCase().includes(search));
+      });
+    renderStores();
+  } catch (error) {
+    console.warn("Stores API unavailable, fallback to mock data", error);
+  }
 }
 
 async function fetchJson(path, options = undefined) {
@@ -1278,6 +1314,17 @@ async function hydrateTasks() {
     renderTasks();
   } catch (error) {
     console.warn("Supplier tasks API unavailable, fallback to mock data", error);
+  }
+}
+
+async function hydrateReports() {
+  try {
+    const data = await fetchJson("/reports?limit=100");
+    if (!data.items?.length) return;
+    reports = data.items.map(mapReportFromApi);
+    renderReports();
+  } catch (error) {
+    console.warn("Reports API unavailable, fallback to mock data", error);
   }
 }
 
@@ -1643,6 +1690,28 @@ function bindAccountRowActions() {
   });
 }
 
+function bindStoreRowActions() {
+  document.querySelectorAll('[data-row-type="store"]').forEach((button) => {
+    button.onclick = async () => {
+      const id = Number(button.getAttribute("data-row-id"));
+      const action = button.getAttribute("data-row-action");
+      const target = stores.find((item) => item.recordId === id);
+      if (!target) return;
+      if (action === "edit") {
+        const payload = promptStorePayload(target);
+        if (!payload) return;
+        await fetchJson(`/stores/${id}`, { method: "PUT", body: JSON.stringify(payload) });
+        await hydrateStores();
+        return;
+      }
+      if (confirm(`确认删除店铺：${target.name}？`)) {
+        await fetchJson(`/stores/${id}`, { method: "DELETE" });
+        await hydrateStores();
+      }
+    };
+  });
+}
+
 function promptProductPayload(source = null) {
   const title = prompt("产品标题", source?.name || "");
   if (!title) return null;
@@ -1691,6 +1760,83 @@ function promptProductPayload(source = null) {
     department_item_no: "",
     qa_count: null,
   };
+}
+
+function promptStorePayload(source = null) {
+  const name = prompt("店铺名", source?.name || "");
+  if (!name) return null;
+  return {
+    name,
+    platform: prompt("平台", source?.platform || "Amazon") || "Amazon",
+    site_code: prompt("站点代码（US/UK/DE/JP/CA/FR/KR）", reverseLocalizeSite(source?.site) || "US") || "US",
+    country_code: prompt("国家代码", source?.countryCode || reverseLocalizeSite(source?.site) || "") || "",
+    seller_identifier: prompt("Seller ID / 店铺标识", source?.seller || "") || "",
+    store_page_url: prompt("店铺链接", source?.storePageUrl || "") || "",
+    status: prompt("状态（active/paused）", source?.rawStatus || "active") || "active",
+    data_source: prompt("数据来源", source?.dataSource || "internal_store_links") || "internal_store_links",
+    notes: prompt("备注", source?.notes || "") || "",
+    is_enabled: (prompt("是否启用（yes/no）", source?.enabled ? "yes" : "yes") || "yes") === "yes",
+  };
+}
+
+function bindStoreCreate() {
+  const button = document.getElementById("stores-create-button");
+  if (!button) return;
+  button.addEventListener("click", async () => {
+    const payload = promptStorePayload();
+    if (!payload) return;
+    try {
+      await fetchJson("/stores", { method: "POST", body: JSON.stringify(payload) });
+      await hydrateStores();
+    } catch (error) {
+      alert(`新增店铺失败：${error.message}`);
+    }
+  });
+}
+
+function bindStoreImport() {
+  const button = document.getElementById("stores-import-button");
+  if (!button) return;
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+    button.textContent = "导入中...";
+    try {
+      await fetchJson("/stores/import/internal", { method: "POST" });
+      await hydrateStores();
+      alert("店铺主档已导入");
+    } catch (error) {
+      alert(`导入店铺失败：${error.message}`);
+    } finally {
+      button.disabled = false;
+      button.textContent = "导入店铺主档";
+    }
+  });
+}
+
+function bindReportActions() {
+  const createButton = document.getElementById("reports-create-button");
+  const refreshButton = document.getElementById("reports-refresh-button");
+  if (createButton) {
+    createButton.addEventListener("click", async () => {
+      const reportType = prompt("报告类型", "产品评论分析");
+      if (!reportType) return;
+      const title = prompt("报告标题", `${reportType}-${new Date().toISOString().slice(0, 10)}`);
+      if (!title) return;
+      const scope = prompt("覆盖范围", "全部店铺") || "全部店铺";
+      try {
+        await fetchJson("/reports", { method: "POST", body: JSON.stringify({ report_type: reportType, title, scope }) });
+        await hydrateReports();
+        alert("Markdown 报告已生成");
+      } catch (error) {
+        alert(`生成报告失败：${error.message}`);
+      }
+    });
+  }
+  if (refreshButton) {
+    refreshButton.addEventListener("click", async () => {
+      await hydrateReports();
+    });
+  }
 }
 
 function promptReviewPayload(source = null) {
@@ -1866,6 +2012,27 @@ function mapProductFromApi(item) {
   };
 }
 
+function mapStoreFromApi(item) {
+  return {
+    recordId: item.id,
+    name: item.name || "未命名店铺",
+    platform: item.platform || "-",
+    site: localizeSite(item.site_code),
+    seller: item.seller_identifier || "-",
+    products: "-",
+    reviews: "-",
+    rating: "-",
+    status: item.is_enabled ? "正常监控" : "暂停",
+    rawStatus: item.status || (item.is_enabled ? "active" : "paused"),
+    sync: item.updated_at || "-",
+    storePageUrl: item.store_page_url || "",
+    countryCode: item.country_code || "",
+    dataSource: item.data_source || "",
+    notes: item.notes || "",
+    enabled: Boolean(item.is_enabled),
+  };
+}
+
 function mapReviewFromApi(item) {
   return {
     recordId: item.id,
@@ -1924,5 +2091,16 @@ function mapTaskFromApi(item) {
     priority: item.priority === "high" ? "高" : item.priority === "medium" ? "中" : "低",
     status: item.status === "pending_feedback" ? "待反馈" : item.status === "in_progress" ? "处理中" : item.status === "observing" ? "观察中" : item.status === "resolved" ? "已整改" : item.status,
     due: item.due_date || "-",
+  };
+}
+
+function mapReportFromApi(item) {
+  return {
+    recordId: item.id,
+    name: item.title || "未命名报告",
+    type: item.report_type || "-",
+    range: item.scope || "全部",
+    time: item.created_at || "-",
+    status: item.status === "generated" ? "可导出" : item.status || "-",
   };
 }
