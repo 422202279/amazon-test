@@ -93,6 +93,18 @@ class SourceCaptureTests(unittest.TestCase):
         self.assertEqual(item["price_currency"], "KRW")
         self.assertEqual(item["review_count"], 19)
 
+    @patch("app.services.source_capture.fetch_page_html")
+    def test_preview_product_from_url_falls_back_to_title_slug_when_page_unavailable(self, mock_fetch):
+        mock_fetch.side_effect = RuntimeError("anti-bot")
+
+        item = preview_product_from_url("https://www.amazon.co.uk/Pet-Prime-Heartbeat-Simulator-Toy/dp/B0FP4JNT75")
+
+        self.assertEqual(item["platform"], "Amazon")
+        self.assertEqual(item["asin"], "B0FP4JNT75")
+        self.assertEqual(item["title"], "Pet Prime Heartbeat Simulator Toy")
+        self.assertEqual(item["capture_status"], "error")
+        self.assertIn("链接路径兜底", item["capture_note"])
+
     @patch("app.routers.ops.preview_product_from_url")
     def test_url_product_preview_applies_manual_overrides(self, mock_preview):
         mock_preview.return_value = {"platform": "Amazon", "site_code": "US", "title": "Demo", "capture_status": "ok"}

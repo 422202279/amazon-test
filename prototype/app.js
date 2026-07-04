@@ -42,15 +42,15 @@ const productColumns = [
   { key: "platform", label: "平台", visible: true },
   { key: "parentAsin", label: "父ASIN", visible: false },
   { key: "category", label: "类目", visible: true },
-  { key: "price", label: "价格", visible: true },
+  { key: "price", label: "价格（原币种）", visible: true },
   { key: "sales", label: "近30天销量", visible: true },
   { key: "salesAmount", label: "近30天销售额", visible: false },
-  { key: "reviews", label: "Review总数", visible: true },
-  { key: "newReviews", label: "月新增评分数", visible: false },
+  { key: "reviews", label: "Review总数 / 新增", visible: true },
+  { key: "newReviews", label: "近30天新增Review", visible: false },
   { key: "rating", label: "评分", visible: true },
   { key: "variantCount", label: "变体数", visible: false },
   { key: "keywords", label: "关键词", visible: true },
-  { key: "bsr", label: "BSR", visible: true },
+  { key: "bsr", label: "BSR（大类/小类）", visible: true },
   { key: "dimensions", label: "尺寸 / 重量", visible: true },
   { key: "fulfillment", label: "配送方式", visible: false },
   { key: "sellerCount", label: "跟卖卖家", visible: true },
@@ -236,18 +236,42 @@ function renderReviewMedia(review, count = 3) {
       ${review.mediaType === "video" && index === 0 ? '<span class="media-play">▶</span>' : ""}
     </span>
   `).join("");
-  if (review.mediaType === "video") {
-    return `
-      <a class="thumb-strip media-link" href="${review.reviewUrl || "#"}" target="_blank" rel="noreferrer" title="仅视频跳转原评论查看">
-        ${mediaMarkup}
-      </a>
-      <span class="cell-sub media-hint">视频仅保存封面图，点击跳转原评论观看</span>
-    `;
-  }
   return `
     <span class="thumb-strip">${mediaMarkup}</span>
-    <span class="cell-sub media-hint">图片缩略图本地展示，不默认跳转</span>
+    <span class="cell-sub media-hint">${review.mediaType === "video" ? "视频仅保留封面图，不默认跳转，避免跳错评论" : "图片缩略图本地展示，不默认跳转"}</span>
   `;
+}
+
+function isExternalUrl(url) {
+  return /^https?:\/\//i.test(String(url || ""));
+}
+
+function renderExternalLink(url, label) {
+  if (!isExternalUrl(url)) return `${label}不可跳转`;
+  return `<a class="link-inline" href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${label}</a>`;
+}
+
+function currencyLabel(currency) {
+  const text = String(currency || "").toUpperCase();
+  return {
+    USD: "USD",
+    GBP: "GBP",
+    EUR: "EUR",
+    JPY: "JPY",
+    CAD: "CAD",
+    KRW: "KRW",
+    "$": "USD",
+    "£": "GBP",
+    "€": "EUR",
+    "¥": "JPY",
+    "CA$": "CAD",
+    "₩": "KRW",
+  }[text] || text || "-";
+}
+
+function formatPriceWithCurrency(amount, currency) {
+  if (amount === null || amount === undefined || amount === "") return "-";
+  return `${currencyLabel(currency)} ${amount}`;
 }
 
 function renderDashboard() {
@@ -465,7 +489,7 @@ function renderProductCell(item, key) {
     salesAmount: item.salesAmount,
     reviews: item.reviews,
     newReviews: item.newReviews,
-    rating: `${item.rating}<span class="cell-sub">带图 ${item.imageReviews}</span>`,
+    rating: `${item.rating}<span class="cell-sub">带图/视频 ${item.imageReviews}</span>`,
     variantCount: item.variantCount,
     keywords: item.keywords,
     bsr: item.bsr,
@@ -631,7 +655,7 @@ function renderReviews() {
       <td><span class="stars">${starString(review.stars)}</span></td>
       <td>${renderReviewMedia(review)}</td>
       <td>${review.content}</td>
-      <td><a class="link-inline" href="${review.productUrl || "#"}" target="_blank" rel="noreferrer">产品链接</a><span class="cell-sub"><a class="link-inline" href="${review.reviewUrl || "#"}" target="_blank" rel="noreferrer">评论链接</a></span></td>
+      <td>${renderExternalLink(review.productUrl, "产品链接")}<span class="cell-sub">${renderExternalLink(review.reviewUrl, "评论链接")}</span></td>
       <td><span class="chip neutral">${review.source}</span></td>
       <td><span class="chip ${review.issue === "其他" ? "neutral" : "warn"}">${review.issue}</span></td>
       <td><span class="status ${review.mood === "正面" ? "success" : review.mood === "中性" ? "warn" : "danger"}">${review.mood}</span></td>
@@ -1058,6 +1082,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   bindStoreFilters();
   bindProductFilters();
   bindReviewFilters();
+  updateStoreFilterOptions("products");
+  updateStoreFilterOptions("reviews");
   bindReviewViewSwitch();
   bindComparisonSubmit();
   bindManualRefresh();
@@ -1126,6 +1152,9 @@ function bindReviewViewSwitch() {
 
 function bindProductFilters() {
   const button = document.getElementById("products-apply-button");
+  document.getElementById("products-platform-filter")?.addEventListener("change", () => updateStoreFilterOptions("products"));
+  document.getElementById("products-site-filter")?.addEventListener("change", () => updateStoreFilterOptions("products"));
+  document.getElementById("products-store-filter")?.addEventListener("change", () => backfillSiteFromStore("products"));
   if (!button) return;
   button.addEventListener("click", async () => {
     await hydrateProducts();
@@ -1134,10 +1163,40 @@ function bindProductFilters() {
 
 function bindReviewFilters() {
   const button = document.getElementById("reviews-apply-button");
+  document.getElementById("reviews-platform-filter")?.addEventListener("change", () => updateStoreFilterOptions("reviews"));
+  document.getElementById("reviews-site-filter")?.addEventListener("change", () => updateStoreFilterOptions("reviews"));
+  document.getElementById("reviews-store-filter")?.addEventListener("change", () => backfillSiteFromStore("reviews"));
   if (!button) return;
   button.addEventListener("click", async () => {
     await hydrateReviews();
   });
+}
+
+function updateStoreFilterOptions(prefix) {
+  const platform = document.getElementById(`${prefix}-platform-filter`)?.value || "";
+  const site = document.getElementById(`${prefix}-site-filter`)?.value || "";
+  const select = document.getElementById(`${prefix}-store-filter`);
+  if (!select) return;
+  const current = select.value;
+  const names = stores
+    .filter((item) => !platform || item.platform === platform)
+    .filter((item) => !site || reverseLocalizeSite(item.site) === site || item.site === localizeSite(site))
+    .map((item) => item.name);
+  const unique = [...new Set(names)].sort((a, b) => a.localeCompare(b, "zh-CN"));
+  select.innerHTML = `<option value="">全部店铺</option>${unique.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("")}`;
+  if (unique.includes(current)) select.value = current;
+}
+
+function backfillSiteFromStore(prefix) {
+  const storeName = document.getElementById(`${prefix}-store-filter`)?.value || "";
+  if (!storeName) return;
+  const matched = stores.find((item) => item.name === storeName);
+  if (!matched) return;
+  const siteSelect = document.getElementById(`${prefix}-site-filter`);
+  const platformSelect = document.getElementById(`${prefix}-platform-filter`);
+  if (siteSelect) siteSelect.value = reverseLocalizeSite(matched.site);
+  if (platformSelect) platformSelect.value = matched.platform;
+  updateStoreFilterOptions(prefix);
 }
 
 function bindComparisonSubmit() {
@@ -1986,17 +2045,17 @@ function mapProductFromApi(item) {
     site: localizeSite(item.site_code),
     platform: item.platform || "-",
     category: item.category_name || item.category_path || "-",
-    productUrl: item.product_url || "",
-    price: item.price_amount ? `${item.price_currency || ""}${item.price_amount}` : "-",
+    productUrl: isExternalUrl(item.product_url) ? item.product_url : "",
+    price: formatPriceWithCurrency(item.price_amount, item.price_currency),
     sales: item.monthly_sales ?? "-",
-    salesAmount: item.monthly_revenue ? `${item.price_currency || ""}${item.monthly_revenue}` : "-",
+    salesAmount: formatPriceWithCurrency(item.monthly_revenue, item.price_currency),
     reviews: item.review_count ?? "-",
     newReviews: "-",
     rating: item.rating ?? "-",
     imageReviews: "-",
     variantCount: item.variation_count ?? "-",
     keywords: [item.keyword_total, item.keyword_organic, item.keyword_ads].filter((value) => value !== null && value !== undefined).join(" / ") || "-",
-    bsr: [item.bsr_main, item.bsr_sub].filter((value) => value !== null && value !== undefined).join(" / ") || "-",
+    bsr: [item.bsr_main ? `大类 ${item.bsr_main}` : "", item.bsr_sub ? `小类 ${item.bsr_sub}` : ""].filter(Boolean).join(" / ") || "-",
     dimensions: [item.size_text, item.weight_text].filter(Boolean).join(" / ") || "-",
     fulfillment: item.fulfillment_type || "-",
     sellerCount: item.seller_count ?? "-",
@@ -2046,8 +2105,8 @@ function mapReviewFromApi(item) {
     stars: item.star_rating || 3,
     hasImage: Boolean(item.has_images || item.review_images),
     mediaType: String(item.review_images || "").toLowerCase().includes("video") ? "video" : (item.has_images ? "image" : "none"),
-    reviewUrl: item.review_url || "#",
-    productUrl: item.product_url || "#",
+    reviewUrl: isExternalUrl(item.review_url) ? item.review_url : "",
+    productUrl: isExternalUrl(item.product_url) ? item.product_url : "",
     content: item.review_content || "暂无评论内容",
     issue: item.issue_category || "待分类",
     mood: item.sentiment || (item.is_negative_review ? "负面" : "中性"),
