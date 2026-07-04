@@ -27,6 +27,7 @@ const productSortState = { key: "", direction: "desc" };
 const reviewSortState = { key: "", direction: "desc" };
 const comparisonSortState = { key: "", direction: "desc" };
 let currentUser = null;
+let activeEditorSubmit = null;
 
 let products = [
   { tone: "tone-1", name: "记忆棉人体工学坐垫", asin: "B0DXSEAT01", parentAsin: "B0DXSEAT00", sku: "CUS-01-US", store: "US Home Store", site: "美国", platform: "Amazon", category: "Home & Kitchen", price: "$29.99", sales: 642, salesAmount: "$19,253", reviews: 1284, newReviews: 36, rating: 4.1, imageReviews: 93, variantCount: 4, keywords: "seat cushion / office cushion", bsr: "#1,248 / #13", dimensions: "45 x 35 x 7 cm / 1.1 kg", fulfillment: "FBA", sellerCount: 2, buybox: "异常", buyboxSeller: "BestHouse US", adFlags: "SP / 视频", contentFlags: "A+ / 品牌店铺", negative: "12 条", issue: "坐感塌陷 / 尺寸偏小", supplier: "宁波舒垫工厂", launchDate: "2026-03-12", rectify: "处理中" },
@@ -1605,14 +1606,7 @@ function bindProductCreate() {
   const button = document.getElementById("products-create-button");
   if (!button) return;
   button.addEventListener("click", async () => {
-    const payload = promptProductPayload();
-    if (!payload) return;
-    try {
-      await fetchJson("/products", { method: "POST", body: JSON.stringify(payload) });
-      await hydrateProducts();
-    } catch (error) {
-      alert(`新增产品失败：${error.message}`);
-    }
+    openProductEditor();
   });
 }
 
@@ -1620,14 +1614,7 @@ function bindReviewCreate() {
   const button = document.getElementById("reviews-create-button");
   if (!button) return;
   button.addEventListener("click", async () => {
-    const payload = promptReviewPayload();
-    if (!payload) return;
-    try {
-      await fetchJson("/reviews", { method: "POST", body: JSON.stringify(payload) });
-      await hydrateReviews();
-    } catch (error) {
-      alert(`新增评论失败：${error.message}`);
-    }
+    openReviewEditor();
   });
 }
 
@@ -1669,10 +1656,7 @@ function bindProductRowActions() {
       const target = products.find((item) => item.recordId === id);
       if (!target) return;
       if (action === "edit") {
-        const payload = promptProductPayload(target);
-        if (!payload) return;
-        await fetchJson(`/products/${id}`, { method: "PUT", body: JSON.stringify(payload) });
-        await hydrateProducts();
+        openProductEditor(target);
         return;
       }
       if (confirm(`确认删除产品：${target.name}？`)) {
@@ -1691,10 +1675,7 @@ function bindReviewRowActions() {
       const target = reviews.find((item) => item.recordId === id);
       if (!target) return;
       if (action === "edit") {
-        const payload = promptReviewPayload(target);
-        if (!payload) return;
-        await fetchJson(`/reviews/${id}`, { method: "PUT", body: JSON.stringify(payload) });
-        await hydrateReviews();
+        openReviewEditor(target);
         return;
       }
       if (confirm(`确认删除评论：${target.title || target.id}？`)) {
@@ -1703,6 +1684,412 @@ function bindReviewRowActions() {
       }
     };
   });
+}
+
+function ensureEditorModal() {
+  let modal = document.getElementById("record-editor-modal");
+  if (modal) return modal;
+  modal = document.createElement("div");
+  modal.id = "record-editor-modal";
+  modal.className = "editor-modal";
+  modal.innerHTML = `
+    <div class="editor-modal-card">
+      <div class="editor-modal-head">
+        <div>
+          <h3 id="editor-modal-title">编辑记录</h3>
+          <p id="editor-modal-subtitle">支持一次性修改整行字段。</p>
+        </div>
+        <button class="editor-modal-close" id="editor-modal-close" type="button">×</button>
+      </div>
+      <div class="editor-modal-body">
+        <form id="editor-modal-form" class="editor-form-grid"></form>
+      </div>
+      <div class="editor-modal-actions">
+        <button class="button ghost" id="editor-modal-cancel" type="button">取消</button>
+        <button class="button primary" id="editor-modal-save" type="button">保存</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.addEventListener("click", (event) => {
+    if (event.target === modal) closeEditorModal();
+  });
+  document.getElementById("editor-modal-close")?.addEventListener("click", closeEditorModal);
+  document.getElementById("editor-modal-cancel")?.addEventListener("click", closeEditorModal);
+  document.getElementById("editor-modal-save")?.addEventListener("click", async () => {
+    if (activeEditorSubmit) await activeEditorSubmit();
+  });
+  return modal;
+}
+
+function closeEditorModal() {
+  const modal = document.getElementById("record-editor-modal");
+  if (!modal) return;
+  modal.classList.remove("open");
+  activeEditorSubmit = null;
+}
+
+function openEditorModal({ title, subtitle, fields, values, onSubmit }) {
+  const modal = ensureEditorModal();
+  const titleNode = document.getElementById("editor-modal-title");
+  const subtitleNode = document.getElementById("editor-modal-subtitle");
+  const form = document.getElementById("editor-modal-form");
+  if (!form) return;
+  if (titleNode) titleNode.textContent = title;
+  if (subtitleNode) subtitleNode.textContent = subtitle;
+  form.innerHTML = fields.map((field) => renderEditorField(field, values[field.key])).join("");
+  activeEditorSubmit = async () => {
+    const formData = collectEditorFormData(fields);
+    await onSubmit(formData);
+    closeEditorModal();
+  };
+  modal.classList.add("open");
+}
+
+function renderEditorField(field, value) {
+  const fullClass = field.full ? "full" : "";
+  if (field.type === "textarea") {
+    return `<label class="${fullClass}"><span>${field.label}</span><textarea data-editor-key="${field.key}">${escapeHtml(value ?? "")}</textarea></label>`;
+  }
+  if (field.type === "select") {
+    return `<label class="${fullClass}"><span>${field.label}</span><select data-editor-key="${field.key}">${(field.options || []).map((option) => `<option value="${escapeHtml(option.value)}"${String(value ?? "") === String(option.value) ? " selected" : ""}>${escapeHtml(option.label)}</option>`).join("")}</select></label>`;
+  }
+  return `<label class="${fullClass}"><span>${field.label}</span><input data-editor-key="${field.key}" type="${field.type || "text"}" value="${escapeHtml(value ?? "")}" /></label>`;
+}
+
+function collectEditorFormData(fields) {
+  const result = {};
+  fields.forEach((field) => {
+    const node = document.querySelector(`[data-editor-key="${field.key}"]`);
+    result[field.key] = node?.value ?? "";
+  });
+  return result;
+}
+
+function productEditorFields() {
+  return [
+    { key: "title", label: "产品标题", full: true },
+    { key: "platform", label: "平台", type: "select", options: platformOptions() },
+    { key: "site_code", label: "站点", type: "select", options: siteOptions() },
+    { key: "store_name", label: "店铺名" },
+    { key: "asin", label: "ASIN" },
+    { key: "parent_asin", label: "父 ASIN" },
+    { key: "sku", label: "SKU" },
+    { key: "department_item_no", label: "部门货号" },
+    { key: "brand", label: "品牌" },
+    { key: "category_name", label: "类目" },
+    { key: "product_url", label: "产品链接", full: true },
+    { key: "image_url", label: "主图链接", full: true },
+    { key: "price_amount", label: "价格数字", type: "number" },
+    { key: "price_currency", label: "币种", type: "select", options: currencyOptions() },
+    { key: "monthly_sales", label: "近30天销量", type: "number" },
+    { key: "monthly_revenue", label: "近30天销售额", type: "number" },
+    { key: "review_count", label: "Review总数", type: "number" },
+    { key: "rating", label: "评分", type: "number" },
+    { key: "variation_count", label: "变体数", type: "number" },
+    { key: "seller_count", label: "跟卖卖家数", type: "number" },
+    { key: "buybox_seller", label: "BuyBox卖家" },
+    { key: "fulfillment_type", label: "配送方式" },
+    { key: "size_text", label: "尺寸" },
+    { key: "weight_text", label: "重量" },
+    { key: "supplier_name", label: "供应商" },
+    { key: "supplier_factory", label: "工厂" },
+    { key: "status", label: "状态" },
+  ];
+}
+
+function reviewEditorFields() {
+  return [
+    { key: "review_title", label: "评论标题", full: true },
+    { key: "platform", label: "平台", type: "select", options: platformOptions() },
+    { key: "site_code", label: "站点", type: "select", options: siteOptions() },
+    { key: "store_name", label: "店铺名" },
+    { key: "asin", label: "ASIN" },
+    { key: "product_title", label: "产品标题", full: true },
+    { key: "review_external_id", label: "评论外部ID" },
+    { key: "star_rating", label: "星级", type: "select", options: starOptions() },
+    { key: "issue_category", label: "问题分类", type: "select", options: issueOptions() },
+    { key: "sentiment", label: "情绪", type: "select", options: sentimentOptions() },
+    { key: "feedback_to_supplier", label: "是否反馈供应商", type: "select", options: yesNoOptions() },
+    { key: "rectification_status", label: "整改状态" },
+    { key: "review_url", label: "评论链接", full: true },
+    { key: "product_url", label: "产品链接", full: true },
+    { key: "review_images", label: "图片/视频标记" },
+    { key: "source_type", label: "数据来源" },
+    { key: "reviewed_at", label: "评论时间" },
+    { key: "review_content", label: "评论内容", type: "textarea", full: true },
+  ];
+}
+
+function openProductEditor(source = null) {
+  const values = buildProductEditorValues(source);
+  openEditorModal({
+    title: source ? "编辑产品" : "新增产品",
+    subtitle: "可一次性修改整行字段；重新抓取时系统应按平台+站点+ASIN/链接优先更新同一条记录。",
+    fields: productEditorFields(),
+    values,
+    onSubmit: async (formData) => {
+      const payload = productPayloadFromForm(formData);
+      try {
+        if (source?.recordId) {
+          await fetchJson(`/products/${source.recordId}`, { method: "PUT", body: JSON.stringify(payload) });
+        } else {
+          await fetchJson("/products", { method: "POST", body: JSON.stringify(payload) });
+        }
+        await hydrateProducts();
+      } catch (error) {
+        alert(`保存产品失败：${error.message}`);
+      }
+    },
+  });
+}
+
+function openReviewEditor(source = null) {
+  const values = buildReviewEditorValues(source);
+  openEditorModal({
+    title: source ? "编辑评论" : "新增评论",
+    subtitle: "评论原文优先保留；问题分类、是否反馈供应商、整改状态支持人工修正。",
+    fields: reviewEditorFields(),
+    values,
+    onSubmit: async (formData) => {
+      const payload = reviewPayloadFromForm(formData);
+      try {
+        if (source?.recordId) {
+          await fetchJson(`/reviews/${source.recordId}`, { method: "PUT", body: JSON.stringify(payload) });
+        } else {
+          await fetchJson("/reviews", { method: "POST", body: JSON.stringify(payload) });
+        }
+        await hydrateReviews();
+      } catch (error) {
+        alert(`保存评论失败：${error.message}`);
+      }
+    },
+  });
+}
+
+function buildProductEditorValues(source = null) {
+  return source ? {
+    title: source.name || "",
+    platform: source.platform || "Amazon",
+    site_code: reverseLocalizeSite(source.site) || "US",
+    store_name: source.store || "",
+    asin: source.asin || "",
+    parent_asin: source.parentAsin === "-" ? "" : (source.parentAsin || ""),
+    sku: source.sku === "-" ? "" : (source.sku || ""),
+    department_item_no: "",
+    brand: "",
+    category_name: source.category === "-" ? "" : (source.category || ""),
+    product_url: source.productUrl || "",
+    image_url: "",
+    price_amount: stripToNumeric(source.price || ""),
+    price_currency: detectCurrencySymbol(source.price || "$"),
+    monthly_sales: source.sales === "-" ? "" : (source.sales || ""),
+    monthly_revenue: stripToNumeric(source.salesAmount || ""),
+    review_count: source.reviews === "-" ? "" : (source.reviews || ""),
+    rating: source.rating === "-" ? "" : (source.rating || ""),
+    variation_count: source.variantCount === "-" ? "" : (source.variantCount || ""),
+    seller_count: source.sellerCount === "-" ? "" : (source.sellerCount || ""),
+    buybox_seller: source.buyboxSeller === "-" ? "" : (source.buyboxSeller || ""),
+    fulfillment_type: source.fulfillment === "-" ? "" : (source.fulfillment || ""),
+    size_text: source.dimensions === "-" ? "" : (source.dimensions || ""),
+    weight_text: source.dimensions === "-" ? "" : (source.dimensions || ""),
+    supplier_name: source.supplier === "-" ? "" : (source.supplier || ""),
+    supplier_factory: source.supplier === "-" ? "" : (source.supplier || ""),
+    status: source.rectify || "正常监控",
+  } : {
+    title: "",
+    platform: "Amazon",
+    site_code: "US",
+    store_name: "",
+    asin: "",
+    parent_asin: "",
+    sku: "",
+    department_item_no: "",
+    brand: "",
+    category_name: "",
+    product_url: "",
+    image_url: "",
+    price_amount: "",
+    price_currency: "USD",
+    monthly_sales: "",
+    monthly_revenue: "",
+    review_count: "",
+    rating: "",
+    variation_count: "",
+    seller_count: "",
+    buybox_seller: "",
+    fulfillment_type: "",
+    size_text: "",
+    weight_text: "",
+    supplier_name: "",
+    supplier_factory: "",
+    status: "正常监控",
+  };
+}
+
+function buildReviewEditorValues(source = null) {
+  return source ? {
+    review_title: source.title || "",
+    platform: source.platform || "Amazon",
+    site_code: reverseLocalizeSite(source.site) || "US",
+    store_name: source.store || "",
+    asin: source.asin === "-" ? "" : (source.asin || ""),
+    product_title: source.product || "",
+    review_external_id: source.id || "",
+    star_rating: String(source.stars || 3),
+    issue_category: source.issue || "待分类",
+    sentiment: source.mood || "中性",
+    feedback_to_supplier: source.feedback === "已反馈" ? "yes" : "no",
+    rectification_status: source.rectify || "待反馈",
+    review_url: source.reviewUrl || "",
+    product_url: source.productUrl || "",
+    review_images: source.mediaType === "video" ? "video" : (source.hasImage ? "image" : ""),
+    source_type: source.source || "手动录入",
+    reviewed_at: source.reviewedAt || new Date().toISOString(),
+    review_content: source.content || "",
+  } : {
+    review_title: "",
+    platform: "Amazon",
+    site_code: "US",
+    store_name: "",
+    asin: "",
+    product_title: "",
+    review_external_id: "",
+    star_rating: "3",
+    issue_category: "待分类",
+    sentiment: "中性",
+    feedback_to_supplier: "no",
+    rectification_status: "待反馈",
+    review_url: "",
+    product_url: "",
+    review_images: "",
+    source_type: "手动录入",
+    reviewed_at: new Date().toISOString(),
+    review_content: "",
+  };
+}
+
+function productPayloadFromForm(data) {
+  return {
+    platform: data.platform,
+    site_code: data.site_code,
+    store_name: data.store_name || "",
+    department_item_no: data.department_item_no || "",
+    sku: data.sku || "",
+    asin: data.asin || "",
+    parent_asin: data.parent_asin || "",
+    title: data.title || "",
+    brand: data.brand || "",
+    category_path: "",
+    category_name: data.category_name || "",
+    product_url: data.product_url || "",
+    image_url: data.image_url || "",
+    price_amount: data.price_amount ? Number(data.price_amount) : null,
+    price_currency: data.price_currency || "",
+    monthly_sales: data.monthly_sales ? Number(data.monthly_sales) : null,
+    monthly_revenue: data.monthly_revenue ? Number(data.monthly_revenue) : null,
+    review_count: data.review_count ? Number(data.review_count) : null,
+    rating: data.rating ? Number(data.rating) : null,
+    qa_count: null,
+    variation_count: data.variation_count ? Number(data.variation_count) : null,
+    seller_count: data.seller_count ? Number(data.seller_count) : null,
+    buybox_seller: data.buybox_seller || "",
+    fulfillment_type: data.fulfillment_type || "",
+    keyword_total: null,
+    keyword_organic: null,
+    keyword_ads: null,
+    bsr_main: null,
+    bsr_sub: null,
+    weight_text: data.weight_text || "",
+    size_text: data.size_text || "",
+    package_weight_text: "",
+    package_size_text: "",
+    supplier_name: data.supplier_name || "",
+    supplier_factory: data.supplier_factory || "",
+    status: data.status || "正常监控",
+  };
+}
+
+function reviewPayloadFromForm(data) {
+  const imageMark = String(data.review_images || "").toLowerCase();
+  return {
+    platform: data.platform,
+    site_code: data.site_code,
+    store_name: data.store_name || "",
+    asin: data.asin || "",
+    product_title: data.product_title || "",
+    review_external_id: data.review_external_id || "",
+    review_url: data.review_url || "",
+    product_url: data.product_url || "",
+    star_rating: data.star_rating ? Number(data.star_rating) : null,
+    review_title: data.review_title || "",
+    review_content: data.review_content || "",
+    review_images: data.review_images || "",
+    reviewer_name: "Local User",
+    review_country: data.site_code || "US",
+    review_language: "zh",
+    is_verified_purchase: true,
+    helpful_count: 0,
+    has_images: imageMark === "image" || imageMark === "video",
+    is_negative_review: data.star_rating ? Number(data.star_rating) <= 3 : false,
+    issue_category: data.issue_category || "待分类",
+    sentiment: data.sentiment || "中性",
+    feedback_to_supplier: data.feedback_to_supplier === "yes",
+    rectification_status: data.rectification_status || "待反馈",
+    source_type: data.source_type || "手动录入",
+    reviewed_at: data.reviewed_at || new Date().toISOString(),
+  };
+}
+
+function platformOptions() {
+  return [
+    { value: "Amazon", label: "Amazon" },
+    { value: "Coupang", label: "Coupang" },
+    { value: "Naver", label: "Naver" },
+  ];
+}
+
+function siteOptions() {
+  return [
+    { value: "US", label: "美国" },
+    { value: "UK", label: "英国" },
+    { value: "DE", label: "德国" },
+    { value: "JP", label: "日本" },
+    { value: "CA", label: "加拿大" },
+    { value: "FR", label: "法国" },
+    { value: "KR", label: "韩国" },
+  ];
+}
+
+function currencyOptions() {
+  return [
+    { value: "USD", label: "USD" },
+    { value: "GBP", label: "GBP" },
+    { value: "EUR", label: "EUR" },
+    { value: "JPY", label: "JPY" },
+    { value: "CAD", label: "CAD" },
+    { value: "KRW", label: "KRW" },
+  ];
+}
+
+function starOptions() {
+  return [1, 2, 3, 4, 5].map((value) => ({ value: String(value), label: `${value} 星` }));
+}
+
+function issueOptions() {
+  return ["待分类", "尺寸问题", "质量问题", "包装破损", "描述不符", "使用效果差", "掉色", "异味", "其他"]
+    .map((value) => ({ value, label: value }));
+}
+
+function sentimentOptions() {
+  return ["正面", "中性", "负面"].map((value) => ({ value, label: value }));
+}
+
+function yesNoOptions() {
+  return [
+    { value: "no", label: "未反馈" },
+    { value: "yes", label: "已反馈" },
+  ];
 }
 
 function bindTaskRowActions() {
