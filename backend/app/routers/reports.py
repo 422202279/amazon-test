@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -61,6 +61,29 @@ def export_report_markdown(report_id: int, db: Session = Depends(get_db)):
         content=content,
         media_type="text/markdown; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="report-{report_id}.md"'},
+    )
+
+
+@router.get("/{report_id}/snapshot")
+def export_report_snapshot(report_id: int, db: Session = Depends(get_db)):
+    report = db.query(Report).filter(Report.id == report_id).one_or_none()
+    if not report:
+        raise HTTPException(status_code=404, detail="报告不存在")
+    try:
+        snapshot = json.loads(report.source_snapshot or "{}")
+    except json.JSONDecodeError:
+        snapshot = {}
+    return JSONResponse(
+        {
+            "id": report.id,
+            "title": report.title,
+            "report_type": report.report_type,
+            "scope": report.scope,
+            "created_at": report.created_at.isoformat(sep=" ", timespec="seconds") if report.created_at else None,
+            "status": report.status,
+            "snapshot": snapshot,
+            "markdown_content": report.markdown_content or "",
+        }
     )
 
 

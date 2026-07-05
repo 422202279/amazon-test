@@ -215,9 +215,51 @@ def bootstrap_local_data(
     return result
 
 
+def _enrich_captured_product_from_db(item: dict, db: Session) -> dict:
+    filters = []
+    if item.get("asin"):
+        filters.append(Product.asin == item["asin"])
+    if item.get("product_url"):
+        filters.append(Product.product_url == item["product_url"])
+    if not filters:
+        return item
+    existing = (
+        db.query(Product)
+        .filter(Product.platform == item.get("platform"), Product.site_code == item.get("site_code"))
+        .filter(or_(*filters))
+        .order_by(Product.updated_at.desc(), Product.id.desc())
+        .first()
+    )
+    if not existing:
+        return item
+    for key in [
+        "title",
+        "localized_title",
+        "brand",
+        "image_url",
+        "price_amount",
+        "price_currency",
+        "review_count",
+        "rating",
+        "store_name",
+        "category_name",
+        "supplier_name",
+        "supplier_factory",
+    ]:
+        if item.get(key) in (None, "", "未识别标题", f"ASIN {item.get('asin')}（待补标题）"):
+            existing_value = getattr(existing, key, None)
+            if existing_value not in (None, ""):
+                item[key] = existing_value
+    if item.get("capture_status") != "ok" and item.get("title") not in (None, "", "未识别标题"):
+        item["capture_status"] = "partial"
+        item["capture_note"] = "公开页抓取受限，已优先用本地产品库补全标题/主图等字段，建议继续交叉校验。"
+    return item
+
+
 @router.post("/url-product-preview")
-def url_product_preview(payload: UrlProductCapturePayload):
+def url_product_preview(payload: UrlProductCapturePayload, db: Session = Depends(get_db)):
     item = preview_product_from_url(payload.url)
+    item = _enrich_captured_product_from_db(item, db)
     if payload.store_name:
         item["store_name"] = payload.store_name
     if payload.supplier_name:
@@ -234,6 +276,7 @@ def url_product_import(
     _: UserAccount = Depends(get_current_user),
 ):
     item = preview_product_from_url(payload.url)
+    item = _enrich_captured_product_from_db(item, db)
     item["store_name"] = payload.store_name or item.get("store_name")
     item["supplier_name"] = payload.supplier_name or item.get("supplier_name")
     item["supplier_factory"] = payload.supplier_factory or item.get("supplier_factory")

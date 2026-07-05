@@ -37,18 +37,14 @@
             <p>从评论批量生成问题任务，跟踪待反馈、处理中、已整改、观察中状态</p>
           </div>
           <div class="topbar-actions">
+            <a class="button ghost" href="./templates/supplier-task-template.xlsx" download>下载供应商模板</a>
             <button class="button ghost">导出整改表</button>
             <button class="button ghost" id="tasks-generate-button">从差评生成任务</button>
             <button class="button primary" id="tasks-create-button">新建整改任务</button>
           </div>
         </header>
 
-        <section class="kanban-summary">
-          <div class="kanban-stat"><span>待反馈</span><strong>8</strong></div>
-          <div class="kanban-stat"><span>处理中</span><strong>11</strong></div>
-          <div class="kanban-stat"><span>观察中</span><strong>5</strong></div>
-          <div class="kanban-stat"><span>已整改</span><strong>34</strong></div>
-        </section>
+        <section class="kanban-summary" id="tasks-summary"></section>
 
         <section class="filters dense">
           <div class="filter-row filter-search wide">

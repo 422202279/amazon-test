@@ -45,29 +45,37 @@
         <section class="filters">
           <div class="filter-row filter-search wide">
             <label>同款组 / 对比输入</label>
-            <textarea id="comparison-input" rows="3" placeholder="优先输入 Parent ASIN；也支持多个 ASIN / SKU。可用逗号、中文逗号、换行或空格分隔。示例：B0DXSEAT01, B0DXSEAT02&#10;CUS-01-US，CUS-01-UK"></textarea>
+            <textarea id="comparison-input" rows="3" placeholder="支持 Parent ASIN、多个 ASIN、多个 SKU 混合粘贴。系统会优先自动识别；可用逗号、中文逗号、换行或空格分隔。"></textarea>
           </div>
           <div class="filter-row">
             <label>对比模式</label>
-            <select id="comparison-mode"><option value="parent">同款多店铺</option><option value="asin">多 ASIN 手动对比</option><option value="sku">多 SKU 手动对比</option></select>
-          </div>
-          <div class="filter-row">
-            <label>对比范围</label>
-            <select id="comparison-scope"><option value="">全部店铺</option><option value="Amazon">仅 Amazon</option><option value="all">含韩国站</option></select>
+            <select id="comparison-mode"><option value="auto">自动识别</option><option value="parent">同款多店铺（Parent ASIN）</option><option value="identifiers">手动多编码对比</option></select>
           </div>
           <div class="filter-row">
             <label>周期</label>
             <select id="comparison-period"><option value="all">全部</option><option value="30d">近 30 天</option><option value="60d">近 60 天</option><option value="90d">近 90 天</option><option value="180d">近半年</option><option value="365d">近一年</option><option value="1095d">近三年</option></select>
           </div>
+          <div class="filter-row wide comparison-site-row">
+            <label>对比站点</label>
+            <div class="checkbox-grid compact" id="comparison-site-picks">
+              <label><input type="checkbox" value="US" checked /> 美国</label>
+              <label><input type="checkbox" value="UK" checked /> 英国</label>
+              <label><input type="checkbox" value="DE" checked /> 德国</label>
+              <label><input type="checkbox" value="JP" checked /> 日本</label>
+              <label><input type="checkbox" value="CA" checked /> 加拿大</label>
+              <label><input type="checkbox" value="FR" checked /> 法国</label>
+              <label><input type="checkbox" value="KR" checked /> 韩国</label>
+            </div>
+          </div>
           <button class="button" id="comparison-apply-button">开始对比</button>
         </section>
 
         <section class="table-summary">
-          <div class="summary-pill">支持 `Parent ASIN / ASIN / SKU` 混合输入</div>
+          <div class="summary-pill">支持 Parent ASIN / ASIN / SKU 混合输入</div>
           <div class="summary-pill">分隔符：`,` `，` 换行 空格</div>
-          <div class="summary-pill">推荐优先用 Parent ASIN 建同款组</div>
-          <div class="summary-pill warn">没有 Parent ASIN 时走手动对比池</div>
-          <div class="summary-pill">指标可切换：全部 / 30天 / 60天 / 90天 / 半年</div>
+          <div class="summary-pill">支持多站点自由勾选对比</div>
+          <div class="summary-pill warn">无 Parent ASIN 时自动退回手动对比</div>
+          <div class="summary-pill">指标可切换：全部 / 30天 / 60天 / 90天 / 半年 / 1年 / 3年</div>
           <div class="summary-pill" id="comparison-notes">当前销量主字段以近30天快照为主</div>
         </section>
 

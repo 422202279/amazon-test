@@ -34,33 +34,41 @@
         <header class="topbar">
           <div>
             <h1>报告中心</h1>
-            <p>沉淀产品评论分析、同款多店铺对比和供应商整改建议报告</p>
+            <p>按固定模板生成可落地的周报、对比报告和整改汇总，不做花哨空壳</p>
           </div>
           <div class="topbar-actions">
             <button class="button ghost" id="reports-refresh-button">刷新报告列表</button>
-            <button class="button primary" id="reports-create-button">新建 Markdown 报告</button>
+            <button class="button primary" id="reports-create-button">新建报告</button>
           </div>
         </header>
 
-        <section class="table-summary">
-          <div class="summary-pill">云部署后仍可生成模板化报告</div>
-          <div class="summary-pill">可导出 Markdown / Excel / Word</div>
-          <div class="summary-pill warn">深度 AI 分析为增强项，不作为基础部署前提</div>
-        </section>
+        <section class="report-grid" id="report-cards"></section>
 
-        <section class="panel" id="report-builder-section">
+        <section class="panel hidden-block" id="report-builder-section">
           <div class="panel-head">
             <div>
               <h2>新建报告</h2>
-              <p>用整表单一次性选择模板、周期、数据模块和导出形式，不再逐项弹窗输入</p>
+              <p>点击新建后再展开；一页内选好模板、覆盖站点、周期、模块和导出形式</p>
             </div>
-            <span class="chip success">可直接生成</span>
+            <div class="panel-actions">
+              <button class="button ghost mini-action" id="report-builder-close-button" type="button">收起</button>
+              <span class="chip success">模板化报告</span>
+            </div>
           </div>
           <div class="form-grid report-builder-grid">
             <label><span>报告标题</span><input id="report-builder-title" type="text" placeholder="例如：7月第1周同款多店铺周报" /></label>
             <label><span>报告类型</span><select id="report-builder-type"><option value="产品评论分析">产品评论分析</option><option value="同款多店铺对比">同款多店铺对比</option><option value="差评原因统计">差评原因统计</option><option value="供应商整改建议">供应商整改建议</option></select></label>
-            <label><span>覆盖范围</span><input id="report-builder-scope" type="text" placeholder="例如：美国 / 英国 / 日本 / 韩国" /></label>
-            <label><span>统计周期</span><select id="report-builder-period"><option value="30d">近30天</option><option value="60d">近60天</option><option value="90d">近90天</option><option value="180d">近半年</option></select></label>
+            <label class="full"><span>覆盖站点</span><div class="checkbox-grid" id="report-builder-scopes">
+              <label><input type="checkbox" value="US" checked /> 美国</label>
+              <label><input type="checkbox" value="UK" checked /> 英国</label>
+              <label><input type="checkbox" value="DE" checked /> 德国</label>
+              <label><input type="checkbox" value="JP" checked /> 日本</label>
+              <label><input type="checkbox" value="CA" checked /> 加拿大</label>
+              <label><input type="checkbox" value="FR" checked /> 法国</label>
+              <label><input type="checkbox" value="KR" checked /> 韩国</label>
+            </div></label>
+            <label><span>统计周期</span><select id="report-builder-period"><option value="30d">近30天</option><option value="60d">近60天</option><option value="90d">近90天</option><option value="180d">近半年</option><option value="365d">近一年</option></select></label>
+            <label><span>补充说明</span><input id="report-builder-scope" type="text" placeholder="例如：只看宠物喂食器 / 重点关注北美差评" /></label>
             <label class="full"><span>勾选模块</span><div class="checkbox-grid" id="report-builder-modules">
               <label><input type="checkbox" value="summary" checked /> 摘要结论</label>
               <label><input type="checkbox" value="product_table" checked /> 产品表格</label>
@@ -71,8 +79,8 @@
             </div></label>
             <label class="full"><span>导出格式</span><div class="checkbox-grid" id="report-builder-formats">
               <label><input type="checkbox" value="markdown" checked /> Markdown</label>
-              <label><input type="checkbox" value="table" checked /> Table 预览</label>
-              <label><input type="checkbox" value="excel" /> Excel 占位</label>
+              <label><input type="checkbox" value="table" checked /> 表格明细</label>
+              <label><input type="checkbox" value="excel" /> Excel 导出</label>
             </div></label>
           </div>
           <div class="topbar-actions section-actions">
@@ -93,38 +101,11 @@
           </div>
         </section>
 
-        <section class="report-grid" id="report-cards"></section>
-
-        <section class="two-col">
-          <div class="panel">
-            <div class="panel-head compact">
-              <h2>云部署可保留能力</h2>
-              <span class="chip success">可实现</span>
-            </div>
-            <div class="setting-list">
-              <div><strong>固定模板报告</strong><span>按产品、店铺、周期自动汇总图表和表格</span></div>
-              <div><strong>导出记录</strong><span>保存谁在什么时间生成和导出了哪份报告</span></div>
-              <div><strong>定时日报 / 周报</strong><span>每天或每周自动生成并留档</span></div>
-            </div>
-          </div>
-          <div class="panel">
-            <div class="panel-head compact">
-              <h2>增强项说明</h2>
-              <span class="chip warn">后续增强</span>
-            </div>
-            <div class="setting-list">
-              <div><strong>AI 结论段落</strong><span>可选接入，不影响基础报表生成</span></div>
-              <div><strong>图片 / 视频证据摘要</strong><span>优先用缩略图和统计，不长期保存大文件</span></div>
-              <div><strong>韩国站补充分析</strong><span>优先用导入数据做报告，不依赖实时抓取</span></div>
-            </div>
-          </div>
-        </section>
-
         <section class="panel">
           <div class="panel-head">
             <div>
               <h2>历史报告</h2>
-              <p>静态页面保留下载入口、来源维度和状态标签</p>
+              <p>生成后可查看 Markdown 正文，也可导出对应表格明细</p>
             </div>
             <div class="segmented">
               <button class="active" data-report-filter="all">全部</button>

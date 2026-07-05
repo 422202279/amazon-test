@@ -42,7 +42,7 @@
           </div>
         </header>
 
-        <section class="filters">
+        <section class="filters sticky-filters">
           <div class="filter-row">
             <label>平台</label>
             <select>
@@ -119,8 +119,8 @@
           </article>
         </section>
 
-        <section class="two-col">
-          <div class="panel">
+        <section class="two-col dashboard-main-grid">
+          <div class="panel dashboard-scroll-panel">
             <div class="panel-head">
               <div>
                 <h2>异常产品雷达</h2>
@@ -128,7 +128,7 @@
               </div>
               <a href="./products.html" class="text-link">查看产品总表</a>
             </div>
-            <div class="table-wrap">
+            <div class="table-wrap dashboard-table-scroll">
               <table>
                 <thead>
                   <tr>
@@ -147,7 +147,7 @@
             </div>
           </div>
 
-          <div class="panel">
+          <div class="panel dashboard-scroll-panel">
             <div class="panel-head">
               <div>
                 <h2>今日重点评论</h2>
@@ -159,29 +159,29 @@
           </div>
         </section>
 
-        <section class="three-col">
-          <div class="panel">
-            <div class="panel-head compact">
-              <h2>资讯快报</h2>
-              <span class="chip success">可检索</span>
-            </div>
-            <div class="news-toolbar">
-              <input id="dashboard-news-search" type="text" placeholder="检索政策 / 平台 / 物流 / 宠物类目资讯" />
-            </div>
-            <ul class="news-list rich" id="dashboard-news-list"></ul>
-            <div class="pager-line">
-              <button class="button ghost mini-action" id="dashboard-news-prev" type="button">上一页</button>
-              <span class="cell-sub" id="dashboard-news-page">第 1 页</span>
-              <button class="button ghost mini-action" id="dashboard-news-next" type="button">下一页</button>
-            </div>
+        <section class="panel">
+          <div class="panel-head compact">
+            <h2>资讯快报</h2>
+            <span class="chip success">关键词检索</span>
           </div>
+          <div class="news-toolbar">
+            <input id="dashboard-news-search" type="text" placeholder="检索政策 / 平台 / 物流 / 宠物类目资讯" />
+          </div>
+          <ul class="news-list rich" id="dashboard-news-list"></ul>
+          <div class="pager-line">
+            <button class="button ghost mini-action" id="dashboard-news-prev" type="button">上一页</button>
+            <span class="cell-sub" id="dashboard-news-page">第 1 页</span>
+            <button class="button ghost mini-action" id="dashboard-news-next" type="button">下一页</button>
+          </div>
+        </section>
 
+        <section class="two-col dashboard-insight-grid">
           <div class="panel">
             <div class="panel-head compact">
               <h2>问题分类 TOP5</h2>
               <span class="chip warn">可维护分类</span>
             </div>
-            <div class="bars" id="dashboard-top-issues"></div>
+            <div class="bars compact-bars" id="dashboard-top-issues"></div>
             <div class="panel-foot-note">
               <a class="text-link" href="./settings.html#issue-taxonomy-panel">去维护问题分类</a>
             </div>
@@ -192,17 +192,17 @@
               <h2>站点评分趋势</h2>
               <span class="chip neutral">近 30 天</span>
             </div>
-            <div class="spark-group" id="dashboard-score-sparks"></div>
+            <div class="spark-group compact-sparks" id="dashboard-score-sparks"></div>
           </div>
         </section>
 
-        <section class="panel">
+        <section class="panel muted-panel">
           <div class="panel-head">
             <div>
-              <h2>真实数据最小验证</h2>
-              <p>优先确认当前系统已经稳定拿到哪些真实字段，避免后续分析建立在假设上</p>
+              <h2>数据接入验证台</h2>
+              <p>这里主要给你确认真实数据链路能拿到哪些字段，不作为首页重点卡片</p>
             </div>
-            <span class="chip success">首页直看</span>
+            <span class="chip neutral">接入校验</span>
           </div>
           <div class="two-col">
             <div>
