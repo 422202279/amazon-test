@@ -87,6 +87,7 @@ SITE_CODE_BY_HINT = {
     ".ca": "CA",
     ".co.uk": "UK",
     ".de": "DE",
+    ".fr": "FR",
     ".co.jp": "JP",
 }
 
@@ -137,16 +138,30 @@ def import_internal_store_links(db: Session, path: str | Path) -> dict[str, int]
     created = 0
     updated = 0
     for row in rows:
+        if not _valid_store_name(row.get("store_name")):
+            continue
         existing = db.execute(
             select(Store).where(
                 Store.platform == row["platform"],
                 Store.site_code == row["site_code"],
                 Store.store_page_url == row["store_page_url"],
             )
-        ).scalar_one_or_none()
+        ).scalars().first()
+        if not existing:
+            existing = db.execute(
+                select(Store).where(
+                    Store.platform == row["platform"],
+                    Store.site_code == row["site_code"],
+                    Store.name == row["store_name"],
+                )
+            ).scalars().first()
         if existing:
-            existing.store_name = row["store_name"]
+            existing.name = row["store_name"] or existing.name
             existing.seller_identifier = row["seller_identifier"]
+            existing.country_code = row["site_code"]
+            existing.store_page_url = row["store_page_url"] or existing.store_page_url
+            existing.data_source = existing.data_source or "manual_sheet"
+            existing.is_enabled = True
             existing.notes = f"source_file={row['source_file']}"
             updated += 1
             continue
@@ -208,12 +223,90 @@ def import_sellersprite_sales_history(db: Session, path: str | Path, limit: int 
 
 def import_internal_store_products(db: Session, path: str | Path, limit: int = 200) -> dict[str, int]:
     rows = preview_internal_store_products(path, limit)
-    return _upsert_products(db, rows)
+    result = _upsert_products(db, rows)
+    store_result = sync_store_registry_from_products(db, rows)
+    result["stores_created"] = store_result["created"]
+    result["stores_updated"] = store_result["updated"]
+    return result
 
 
 def import_sellersprite_products(db: Session, path: str | Path, limit: int = 200, sheet_name: str | None = None) -> dict[str, int]:
     rows = preview_sellersprite_products(path, sheet_name, limit)
-    return _upsert_products(db, rows)
+    result = _upsert_products(db, rows)
+    store_result = sync_store_registry_from_products(db, rows)
+    result["stores_created"] = store_result["created"]
+    result["stores_updated"] = store_result["updated"]
+    return result
+
+
+def sync_store_registry_from_products(db: Session, rows: list[dict]) -> dict[str, int]:
+    created = 0
+    updated = 0
+    seen_keys: set[tuple[str, str, str]] = set()
+    for row in rows:
+        store_name = row.get("store_name")
+        if not _valid_store_name(store_name):
+            continue
+        store_name = _normalize_store_name(store_name)
+        key = (row["platform"], row["site_code"], store_name)
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        existing = db.execute(
+            select(Store).where(
+                Store.platform == row["platform"],
+                Store.site_code == row["site_code"],
+                Store.name == store_name,
+            )
+        ).scalars().first()
+        if existing:
+            existing.country_code = row["site_code"]
+            existing.store_page_url = row.get("store_page_url") or existing.store_page_url
+            existing.seller_identifier = existing.seller_identifier or row.get("buybox_seller")
+            existing.is_enabled = True
+            updated += 1
+            continue
+        db.add(
+            Store(
+                name=store_name,
+                platform=row["platform"],
+                site_code=row["site_code"],
+                country_code=row["site_code"],
+                seller_identifier=row.get("buybox_seller"),
+                store_page_url=row.get("store_page_url"),
+                status="active",
+                data_source="product_import",
+                notes=f"auto_synced_from_product:{row.get('source_file') or 'unknown'}",
+                is_enabled=True,
+            )
+        )
+        created += 1
+    return {"created": created, "updated": updated}
+
+
+def deduplicate_store_registry(db: Session) -> dict[str, int]:
+    removed = 0
+    stores = db.execute(select(Store).order_by(Store.id.asc())).scalars().all()
+    keepers: dict[tuple[str, str, str], Store] = {}
+    for store in stores:
+        normalized_name = _normalize_store_name(store.name)
+        if not normalized_name:
+            continue
+        key = (store.platform, store.site_code, normalized_name)
+        keeper = keepers.get(key)
+        if not keeper:
+            store.name = normalized_name
+            keepers[key] = store
+            continue
+        keeper.store_page_url = keeper.store_page_url or store.store_page_url
+        keeper.seller_identifier = keeper.seller_identifier or store.seller_identifier
+        keeper.country_code = keeper.country_code or store.country_code
+        keeper.data_source = keeper.data_source or store.data_source
+        keeper.notes = keeper.notes or store.notes
+        keeper.is_enabled = keeper.is_enabled or store.is_enabled
+        db.delete(store)
+        removed += 1
+    return {"removed": removed}
 
 
 def normalize_internal_row(row: pd.Series, source_file: str) -> NormalizedProductRow:
@@ -293,7 +386,7 @@ def normalize_sellersprite_row(row: pd.Series, source_file: str) -> NormalizedPr
 def normalize_store_row(row: pd.Series, source_file: str) -> NormalizedStoreRow:
     raw_store_name = _safe_text(row.get("店铺")) or _safe_text(row.get("店铺名称"))
     url = _safe_text(row.get("所有产品页链接"))
-    normalized_name = raw_store_name.replace("  ", " ") if raw_store_name else None
+    normalized_name = _normalize_store_name(raw_store_name)
     platform = _infer_platform(url, normalized_name)
     return NormalizedStoreRow(
         platform=platform,
@@ -446,6 +539,24 @@ def _safe_text(value) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def _normalize_store_name(value: str | None) -> str | None:
+    text = _safe_text(value)
+    if not text:
+        return None
+    return re.sub(r"\s+", " ", text)
+
+
+def _valid_store_name(value: str | None) -> bool:
+    text = _normalize_store_name(value)
+    if not text:
+        return False
+    if text.isdigit():
+        return False
+    if len(text) < 2:
+        return False
+    return True
 
 
 def _normalize_payload(row: pd.Series) -> dict:

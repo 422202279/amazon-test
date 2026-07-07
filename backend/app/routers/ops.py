@@ -17,6 +17,7 @@ from app.serializers import to_dict
 from app.security import get_current_user
 from app.services.data_quality import build_data_quality_summary
 from app.services.product_importer import (
+    deduplicate_store_registry,
     import_internal_store_links,
     import_internal_store_products,
     import_sellersprite_sales_history,
@@ -206,12 +207,15 @@ def bootstrap_local_data(
         "internal_products": {"created": 0, "updated": 0},
         "sellersprite_products": {"created": 0, "updated": 0},
         "sales_history": {"created": 0, "updated": 0},
+        "store_cleanup": {"removed": 0},
     }
     result["stores"] = import_internal_store_links(db, internal_path)
-    result["internal_products"] = import_internal_store_products(db, internal_path, 200)
-    result["sellersprite_products"] = import_sellersprite_products(db, product_path, 200)
-    result["sales_history"] = import_sellersprite_sales_history(db, sales_path, 200)
+    result["internal_products"] = import_internal_store_products(db, internal_path, 5000)
+    result["sellersprite_products"] = import_sellersprite_products(db, product_path, 5000)
+    result["sales_history"] = import_sellersprite_sales_history(db, sales_path, 5000)
+    result["store_cleanup"] = deduplicate_store_registry(db)
     db.commit()
+    result["quality"] = build_data_quality_summary(db)
     return result
 
 
