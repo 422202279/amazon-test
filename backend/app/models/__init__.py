@@ -6,5 +6,6 @@ from app.models.review import Review
 from app.models.store import Store
 from app.models.supplier_task import SupplierTask
 from app.models.user_account import UserAccount
+from app.models.user_session import UserSession
 
-__all__ = ["ImportJob", "Product", "ProductMetricHistory", "Report", "Review", "Store", "SupplierTask", "UserAccount"]
+__all__ = ["ImportJob", "Product", "ProductMetricHistory", "Report", "Review", "Store", "SupplierTask", "UserAccount", "UserSession"]

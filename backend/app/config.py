@@ -36,8 +36,19 @@ class Settings(BaseSettings):
     sample_data_dir: Path = DEFAULT_SAMPLE_DATA_DIR
     default_schedule_times: str = "06:00"
     max_schedule_times: int = 3
+    admin_email: str = "admin@cb-monitor.local"
+    admin_initial_password: str = ""
+    session_ttl_hours: int = 168
+    cors_origins: str = "http://localhost:4173,http://127.0.0.1:4173"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 
 settings = Settings()
+
+
+def allowed_cors_origins() -> list[str]:
+    origins = [item.strip() for item in settings.cors_origins.split(",") if item.strip()]
+    if settings.app_env.lower() == "production":
+        return [origin for origin in origins if origin != "*"]
+    return origins

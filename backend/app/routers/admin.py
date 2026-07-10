@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.config import settings
 from app.models.user_account import UserAccount
 from app.security import get_current_user, hash_password
 
@@ -90,7 +91,7 @@ def delete_user(
     user = db.query(UserAccount).filter(UserAccount.id == user_id).one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="账号不存在")
-    if user.email == "admin@cb-monitor.local":
+    if user.email == settings.admin_email:
         raise HTTPException(status_code=400, detail="默认管理员不可删除")
     db.delete(user)
     db.commit()

@@ -35,7 +35,7 @@ class ImporterTests(unittest.TestCase):
         self.session_factory = sessionmaker(bind=self.engine, autoflush=False, autocommit=False)
         Base.metadata.create_all(bind=self.engine)
 
-    def test_internal_store_links_cover_amazon_and_korea(self):
+    def test_internal_store_links_reflect_current_source_workbook_coverage(self):
         rows = preview_internal_store_links(INTERNAL_WORKBOOK)
 
         self.assertGreaterEqual(len(rows), 9)
@@ -43,7 +43,8 @@ class ImporterTests(unittest.TestCase):
         platforms = {row["platform"] for row in rows}
         self.assertIn("Amazon", platforms)
         self.assertIn("Coupang", platforms)
-        self.assertIn("Naver", platforms)
+        # The provided workbook has no Naver store row. Do not invent one during import.
+        self.assertNotIn("Naver", platforms)
 
         coupang = next(row for row in rows if row["platform"] == "Coupang")
         self.assertEqual(coupang["site_code"], "KR")

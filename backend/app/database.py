@@ -35,6 +35,7 @@ def ensure_lightweight_migrations() -> None:
             "stores_json": "TEXT",
             "status": "VARCHAR(40) DEFAULT '启用'",
             "last_login_at": "DATETIME",
+            "must_change_password": "BOOLEAN DEFAULT 1",
         },
         "products": {
             "localized_title": "VARCHAR(1000)",

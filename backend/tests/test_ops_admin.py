@@ -1,6 +1,7 @@
 import sys
 import tempfile
 import unittest
+import hashlib
 from pathlib import Path
 from unittest.mock import patch
 
@@ -21,9 +22,9 @@ from app.routers.admin import (
     list_users,
     update_user,
 )
-from app.routers.auth import LoginPayload, login, me
+from app.routers.auth import ChangePasswordPayload, LoginPayload, change_password, login, me
 from app.routers.ops import create_backup, deployment_profile, list_backups, live_validation, restore_backup, source_capabilities
-from app.security import ensure_default_admin
+from app.security import TOKEN_STORE, ensure_default_admin, get_current_user
 
 
 class OpsAdminTests(unittest.TestCase):
@@ -68,7 +69,55 @@ class OpsAdminTests(unittest.TestCase):
             me_payload = me(user=admin_user)
 
         self.assertIn("token", payload)
+        self.assertNotIn("default_password_notice", payload)
         self.assertEqual(me_payload["email"], "admin@cb-monitor.local")
+
+    def test_session_remains_valid_after_in_memory_cache_is_cleared(self):
+        with self.session_factory() as db:
+            ensure_default_admin(db)
+            payload = login(LoginPayload(email="admin@cb-monitor.local", password="admin123456"), db=db)
+            TOKEN_STORE.clear()
+
+            current_user = get_current_user(
+                authorization=f"Bearer {payload['token']}",
+                db=db,
+            )
+
+        self.assertEqual(current_user.email, "admin@cb-monitor.local")
+
+    def test_password_change_clears_first_login_requirement(self):
+        with self.session_factory() as db:
+            ensure_default_admin(db)
+            admin_user = db.query(UserAccount).filter(UserAccount.email == "admin@cb-monitor.local").one()
+            self.assertTrue(admin_user.must_change_password)
+
+            changed = change_password(
+                ChangePasswordPayload(current_password="admin123456", new_password="NewStrongPass123"),
+                db=db,
+                user=admin_user,
+            )
+            payload = login(LoginPayload(email="admin@cb-monitor.local", password="NewStrongPass123"), db=db)
+
+        self.assertTrue(changed["ok"])
+        self.assertFalse(payload["user"]["must_change_password"])
+
+    def test_legacy_default_admin_hash_is_migrated_once(self):
+        legacy_hash = hashlib.sha256(b"cb-monitor-lite-local:admin123456").hexdigest()
+        with self.session_factory() as db:
+            db.add(
+                UserAccount(
+                    name="系统管理员",
+                    email="admin@cb-monitor.local",
+                    password_hash=legacy_hash,
+                    role="管理员",
+                    status="启用",
+                )
+            )
+            db.commit()
+            ensure_default_admin(db)
+            payload = login(LoginPayload(email="admin@cb-monitor.local", password="admin123456"), db=db)
+
+        self.assertTrue(payload["user"]["must_change_password"])
 
     def test_create_and_update_user(self):
         with self.session_factory() as db:

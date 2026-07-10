@@ -1,4 +1,7 @@
-const stores = [
+const APP_ENV = window.__APP_ENV__ || "production";
+const API_BASE = window.__API_BASE__ || "/api";
+
+const demoStores = [
   { name: "US Home Store", platform: "Amazon", site: "美国", seller: "A1USHOME88", products: 24, reviews: 642, rating: 4.3, status: "正常监控", sync: "2026-07-02 09:30" },
   { name: "UK Living", platform: "Amazon", site: "英国", seller: "A1UKLIFE22", products: 16, reviews: 318, rating: 4.2, status: "正常监控", sync: "2026-07-02 08:55" },
   { name: "DE Ordnung", platform: "Amazon", site: "德国", seller: "A1DEHOME77", products: 14, reviews: 279, rating: 4.0, status: "待补数据", sync: "2026-07-01 22:10" },
@@ -10,7 +13,8 @@ const stores = [
   { name: "EU Hybrid", platform: "Amazon", site: "欧洲混合", seller: "A1EUHYBRID", products: 9, reviews: 98, rating: 3.9, status: "正常监控", sync: "2026-07-02 06:58" }
 ];
 
-const API_BASE = "http://127.0.0.1:8000/api";
+let allStores = APP_ENV === "demo" ? demoStores.slice() : [];
+let stores = allStores.slice();
 const AUTH_TOKEN_KEY = "cb-auth-token";
 const AUTH_USER_KEY = "cb-auth-user";
 const ISSUE_TAXONOMY_KEY = "cb-issue-taxonomy-v1";
@@ -40,7 +44,7 @@ let taskStatusFilter = "all";
 const selectedProductRecordIds = new Set();
 const RECENT_TASK_CODES_KEY = "cb-recent-generated-task-codes";
 
-const dashboardNewsItems = [
+const demoDashboardNewsItems = [
   { title: "亚马逊欧洲站包装与回收责任新要求", tag: "政策", summary: "关注法国、德国包装回收合规，涉及宠物类目包装标识与回收责任。", url: "https://sell.amazon.com" },
   { title: "Amazon Review 展示逻辑与权重变化观察", tag: "平台", summary: "重点关注低星评论、带图评论和近30天新增评论对转化的影响。", url: "https://sellercentral.amazon.com" },
   { title: "Coupang 店铺页商品展示节奏变化", tag: "韩国", summary: "韩国站建议继续以人工校验样本为主，避免把公开页当自动主链路。", url: "https://www.coupang.com" },
@@ -50,14 +54,16 @@ const dashboardNewsItems = [
   { title: "加拿大站新上架宠物喂食器竞争观察", tag: "市场", summary: "自动喂食器类目竞争加快，需同时关注评分、BSR 和带图评论比例。", url: "https://www.amazon.ca" },
   { title: "法国站近期 VAT 与包装义务提醒", tag: "政策", summary: "正式部署前建议把法国站数据源、价格币种和包装责任一并校验。", url: "https://www.amazon.fr" },
 ];
+const dashboardNewsItems = APP_ENV === "demo" ? demoDashboardNewsItems : [];
 
-let products = [
+const demoProducts = [
   { tone: "tone-1", name: "记忆棉人体工学坐垫", asin: "B0DXSEAT01", parentAsin: "B0DXSEAT00", sku: "CUS-01-US", store: "US Home Store", site: "美国", platform: "Amazon", category: "Home & Kitchen", price: "$29.99", sales: 642, salesAmount: "$19,253", reviews: 1284, newReviews: 36, rating: 4.1, imageReviews: 93, variantCount: 4, keywords: "seat cushion / office cushion", bsr: "#1,248 / #13", dimensions: "45 x 35 x 7 cm / 1.1 kg", fulfillment: "FBA", sellerCount: 2, buybox: "异常", buyboxSeller: "BestHouse US", adFlags: "SP / 视频", contentFlags: "A+ / 品牌店铺", negative: "12 条", issue: "坐感塌陷 / 尺寸偏小", supplier: "宁波舒垫工厂", launchDate: "2026-03-12", rectify: "处理中" },
   { tone: "tone-2", name: "防漏便携咖啡杯", asin: "B0DXMUG889", parentAsin: "B0DXMUG800", sku: "MUG-02-UK", store: "UK Living", site: "英国", platform: "Amazon", category: "Kitchen & Dining", price: "£18.90", sales: 411, salesAmount: "£7,768", reviews: 986, newReviews: 18, rating: 4.3, imageReviews: 54, variantCount: 3, keywords: "travel mug / leak proof mug", bsr: "#2,904 / #41", dimensions: "510 ml / 370 g", fulfillment: "FBA", sellerCount: 1, buybox: "正常", buyboxSeller: "UK Living", adFlags: "SP", contentFlags: "A+ / 视频", negative: "4 条", issue: "漏水 / 杯盖卡扣", supplier: "厦门啡行", launchDate: "2025-11-09", rectify: "观察中" },
   { tone: "tone-3", name: "不锈钢保温杯 900ml", asin: "B0DXTHERM7", parentAsin: "B0DXTHERM0", sku: "BOT-09-DE", store: "DE Ordnung", site: "德国", platform: "Amazon", category: "Sports & Outdoors", price: "€23.50", sales: 372, salesAmount: "€8,742", reviews: 744, newReviews: 24, rating: 3.9, imageReviews: 48, variantCount: 2, keywords: "thermo bottle / trinkflasche", bsr: "#4,512 / #67", dimensions: "900 ml / 420 g", fulfillment: "FBA", sellerCount: 3, buybox: "正常", buyboxSeller: "Pet Prime DE", adFlags: "SP / SB", contentFlags: "A+", negative: "9 条", issue: "保温差 / 涂层掉色", supplier: "永康饮具厂", launchDate: "2025-08-18", rectify: "待反馈" },
   { tone: "tone-4", name: "瑜伽垫加厚防滑款", asin: "B0DXYOGA88", parentAsin: "B0DXYOGA80", sku: "YOG-07-JP", store: "JP Kitchen", site: "日本", platform: "Amazon", category: "Sports & Fitness", price: "¥3,980", sales: 298, salesAmount: "¥1,186,040", reviews: 522, newReviews: 15, rating: 4.0, imageReviews: 60, variantCount: 2, keywords: "yoga mat / ストレッチマット", bsr: "#3,220 / #28", dimensions: "183 x 61 x 1 cm / 880 g", fulfillment: "FBA", sellerCount: 1, buybox: "正常", buyboxSeller: "JP Kitchen", adFlags: "SP / 视频", contentFlags: "A+ / 品牌故事", negative: "6 条", issue: "异味 / 边缘卷曲", supplier: "南通健身材", launchDate: "2026-01-26", rectify: "处理中" },
   { tone: "tone-5", name: "化妆镜带灯便携折叠款", asin: "B0DXMIRROR", parentAsin: "B0DXMIRR00", sku: "MIR-11-US", store: "CA Comfort", site: "加拿大", platform: "Amazon", category: "Beauty & Personal Care", price: "CA$25.00", sales: 221, salesAmount: "CA$5,525", reviews: 448, newReviews: 11, rating: 4.5, imageReviews: 51, variantCount: 1, keywords: "makeup mirror / led mirror", bsr: "#1,987 / #22", dimensions: "18 x 13 x 3 cm / 520 g", fulfillment: "FBA", sellerCount: 1, buybox: "正常", buyboxSeller: "Petmo", adFlags: "视频", contentFlags: "A+ / 视频", negative: "2 条", issue: "电池续航", supplier: "深圳美妆科技", launchDate: "2026-04-16", rectify: "已整改" }
 ];
+let products = APP_ENV === "demo" ? demoProducts.slice() : [];
 
 const productColumns = [
   { key: "product", label: "产品", locked: true, visible: true },
@@ -91,7 +97,7 @@ const productColumns = [
 
 const productColumnStorageKey = "cb-product-columns-v1";
 
-let reviews = [
+const demoReviews = [
   { tone: "tone-1", id: "RV-10021", title: "坐两天就塌了", product: "记忆棉人体工学坐垫", store: "US Home Store", site: "美国", platform: "Amazon", stars: 2, hasImage: true, mediaType: "image", reviewUrl: "https://www.amazon.com/product-reviews/B0DXSEAT01", productUrl: "https://www.amazon.com/dp/B0DXSEAT01", content: "刚开始还可以，坐了几天中间明显塌陷，尾椎支撑不够，和图片有差距。", issue: "质量问题", mood: "负面", feedback: "未反馈", rectify: "待反馈", source: "页面补抓", asin: "B0DXSEAT01" },
   { tone: "tone-2", id: "RV-10022", title: "杯盖还是会漏", product: "防漏便携咖啡杯", store: "UK Living", site: "英国", platform: "Amazon", stars: 3, hasImage: true, mediaType: "video", reviewUrl: "https://www.amazon.co.uk/product-reviews/B0DXMUG889", productUrl: "https://www.amazon.co.uk/dp/B0DXMUG889", content: "保温不错，但背包里横放后杯盖附近还是会渗水，不适合通勤。", issue: "使用效果差", mood: "中性", feedback: "已反馈", rectify: "处理中", source: "导入", asin: "B0DXMUG889" },
   { tone: "tone-3", id: "RV-10023", title: "颜色掉漆", product: "不锈钢保温杯 900ml", store: "DE Ordnung", site: "德国", platform: "Amazon", stars: 1, hasImage: true, mediaType: "image", reviewUrl: "https://www.amazon.de/product-reviews/B0DXTHERM7", productUrl: "https://www.amazon.de/dp/B0DXTHERM7", content: "用了不到一周表面开始掉色，图片里看着很高级，实物做工一般。", issue: "掉色", mood: "负面", feedback: "未反馈", rectify: "待反馈", source: "页面补抓", asin: "B0DXTHERM7" },
@@ -99,28 +105,32 @@ let reviews = [
   { tone: "tone-5", id: "RV-10025", title: "灯光柔和", product: "化妆镜带灯便携折叠款", store: "CA Comfort", site: "加拿大", platform: "Amazon", stars: 5, hasImage: true, mediaType: "image", reviewUrl: "https://www.amazon.ca/product-reviews/B0DXMIRROR", productUrl: "https://www.amazon.ca/dp/B0DXMIRROR", content: "灯光很自然，出差带着方便，折叠后不占地方，充一次电能用很久。", issue: "其他", mood: "正面", feedback: "无需反馈", rectify: "已关闭", source: "导入", asin: "B0DXMIRROR" },
   { tone: "tone-6", id: "RV-10026", title: "尺寸偏小", product: "记忆棉人体工学坐垫", store: "Coupang Seoul", site: "韩国", platform: "Coupang", stars: 2, hasImage: true, mediaType: "video", reviewUrl: "https://www.amazon.com/product-reviews/B0DXSEAT01", productUrl: "https://www.amazon.com/dp/B0DXSEAT01", content: "看图以为会更宽，放在办公室椅子上略小，长时间坐不太稳。", issue: "尺寸问题", mood: "负面", feedback: "已反馈", rectify: "处理中", source: "人工修正", asin: "B0DXSEAT01" }
 ];
+let reviews = APP_ENV === "demo" ? demoReviews.slice() : [];
 
-let comparisonData = [
+const demoComparisonData = [
   { store: "US Home Store", site: "美国", sales: 642, salesAmount: "$19,253", score: 4.1, negative: 8.6, volume: 1284, imageReviews: 93, top3: "坐感塌陷 / 尺寸偏小 / 回弹慢", action: "调整内芯密度与文案说明" },
   { store: "UK Living", site: "英国", sales: 411, salesAmount: "£7,768", score: 4.3, negative: 5.1, volume: 816, imageReviews: 48, top3: "尺寸偏小 / 包装褶皱 / 回弹慢", action: "优化尺寸图与包装说明" },
   { store: "DE Ordnung", site: "德国", sales: 372, salesAmount: "€8,742", score: 3.8, negative: 11.9, volume: 604, imageReviews: 52, top3: "坐感塌陷 / 描述不符 / 物流破损", action: "排查批次与物流包装" },
   { store: "Coupang Seoul", site: "韩国", sales: 295, salesAmount: "₩8,410,000", score: 4.0, negative: 7.4, volume: 472, imageReviews: 37, top3: "尺寸偏小 / 坐感偏硬 / 缝线粗糙", action: "本地化尺寸说明，抽检缝线" }
 ];
+let comparisonData = APP_ENV === "demo" ? demoComparisonData.slice() : [];
 
-const tasks = [
+const demoTasks = [
   { id: "SR-2048", product: "记忆棉人体工学坐垫", supplier: "宁波舒垫工厂", issue: "质量问题", evidence: "12 条差评指向坐感塌陷，含 7 条带图", suggestedAction: "先做内芯密度抽检，再给出材料与工艺调整计划", actualRectification: "已增加抽检频次，待回传改良样", priority: "高", status: "处理中", due: "2026-07-08" },
   { id: "SR-2049", product: "防漏便携咖啡杯", supplier: "厦门啡行", issue: "使用效果差", evidence: "5 条评论反馈杯盖横放渗水", suggestedAction: "复核密封圈与卡扣结构，先出问题定位报告", actualRectification: "待供应商反馈", priority: "中", status: "待反馈", due: "2026-07-06" },
   { id: "SR-2050", product: "不锈钢保温杯 900ml", supplier: "永康饮具厂", issue: "掉色", evidence: "德国站 4 条 1 星评论附图", suggestedAction: "补做附着力测试并核查表面喷涂工艺", actualRectification: "待供应商反馈", priority: "高", status: "待反馈", due: "2026-07-05" },
   { id: "SR-2051", product: "瑜伽垫加厚防滑款", supplier: "南通健身材", issue: "异味", evidence: "日本站 6 条差评集中在拆封异味", suggestedAction: "排查材料与包装密封方式，追加散味验证", actualRectification: "观察新批次反馈中", priority: "中", status: "观察中", due: "2026-07-12" },
   { id: "SR-2052", product: "化妆镜带灯便携折叠款", supplier: "深圳美妆科技", issue: "电池续航", evidence: "已完成电池批次替换验证", suggestedAction: "跟进电池批次替换后的稳定性回访", actualRectification: "已完成电池批次替换", priority: "低", status: "已整改", due: "2026-06-28" }
 ];
+let tasks = APP_ENV === "demo" ? demoTasks.slice() : [];
 
-const reports = [
+const demoReports = [
   { name: "记忆棉坐垫评论分析报告", type: "产品评论分析", range: "US / UK / DE / KR", time: "2026-07-02 10:30", status: "最新" },
   { name: "多店铺坐垫差评归因对比", type: "多店铺对比", range: "4 店铺同款产品", time: "2026-07-01 18:20", status: "已归档" },
   { name: "6 月供应商整改建议汇总", type: "供应商建议", range: "8 个产品 / 5 家供应商", time: "2026-06-30 17:00", status: "可导出" },
   { name: "北美站购物车异常报告", type: "风险报告", range: "美国 / 加拿大", time: "2026-06-29 09:40", status: "待复核" }
 ];
+let reports = APP_ENV === "demo" ? demoReports.slice() : [];
 
 let accounts = [
   { name: "系统管理员", email: "admin@cb-monitor.local", role: "管理员", scope: "全部店铺 / 全部模块", stores: ["US Home Store", "UK Living", "JP Kitchen", "CA Comfort"], status: "启用", lastLogin: "2026-07-03 09:12" },
@@ -456,7 +466,7 @@ function renderStores() {
       <td>${store.sync}</td>
       <td>${renderRowActions("store", store.recordId)}</td>
     </tr>
-  `).join("");
+  `).join("") || '<tr><td colspan="10" class="empty-state">暂无店铺数据，请先导入或新增店铺。</td></tr>';
   bindStoreRowActions();
 }
 
@@ -475,7 +485,7 @@ function renderProducts() {
       ${visibleColumns.map((column) => `<td data-col="${column.key}">${renderProductCell(item, column.key)}</td>`).join("")}
       <td>${renderRowActions("product", item.recordId)}</td>
     </tr>
-  `).join("");
+  `).join("") || `<tr><td colspan="${visibleColumns.length + 2}" class="empty-state">当前筛选条件下暂无产品数据。</td></tr>`;
 
   head.querySelectorAll("th[data-col]").forEach((cell) => {
     cell.style.cursor = "pointer";
@@ -757,7 +767,7 @@ function renderReviews() {
         <td><span class="status neutral">查看子评论</span></td>
         <td><span class="cell-sub">聚合视图不支持直接编辑</span></td>
       </tr>
-    `).join("");
+    `).join("") || '<tr><td colspan="13" class="empty-state">当前筛选条件下暂无评论数据。</td></tr>';
     bindReviewSort();
     updateReviewSummary(sortedGroups, true);
     return;
@@ -792,7 +802,7 @@ function renderReviews() {
       <td><span class="status ${statusClass(review.rectify)}">${review.rectify}</span>${review.supplierTaskStatus ? `<span class="cell-sub">${review.supplierTaskStatus}${review.supplierTaskNotes ? ` · ${review.supplierTaskNotes}` : ""}</span>` : ""}</td>
       <td>${renderRowActions("review", review.recordId)}</td>
     </tr>
-  `).join("");
+  `).join("") || '<tr><td colspan="13" class="empty-state">当前筛选条件下暂无评论数据。</td></tr>';
   bindReviewSort();
   updateReviewSummary(sortedReviews, false);
   bindReviewRowActions();
@@ -1663,7 +1673,7 @@ function updateStoreFilterOptions(prefix) {
   const select = document.getElementById(`${prefix}-store-filter`);
   if (!select) return;
   const current = select.value;
-  const names = stores
+  const names = allStores
     .filter((item) => !platform || item.platform === platform)
     .filter((item) => !site || reverseLocalizeSite(item.site) === site || item.site === localizeSite(site))
     .map((item) => item.name);
@@ -1675,7 +1685,7 @@ function updateStoreFilterOptions(prefix) {
 function backfillSiteFromStore(prefix) {
   const storeName = document.getElementById(`${prefix}-store-filter`)?.value || "";
   if (!storeName) return;
-  const matched = stores.find((item) => item.name === storeName);
+  const matched = allStores.find((item) => item.name === storeName);
   if (!matched) return;
   const siteSelect = document.getElementById(`${prefix}-site-filter`);
   const platformSelect = document.getElementById(`${prefix}-platform-filter`);
@@ -1758,12 +1768,13 @@ function bindManualRefresh() {
 
 async function hydrateLiveData() {
   const page = document.body.dataset.page;
+  await hydrateStoreRegistry();
   if (page === "dashboard") {
     await hydrateProducts();
     await hydrateReviews();
     await hydrateTasks();
   }
-  if (page === "stores") await hydrateStores();
+  if (page === "stores") await hydrateStores(false);
   if (page === "products") await hydrateProducts();
   if (page === "reviews") await hydrateReviews();
   if (page === "comparison") await hydrateComparison();
@@ -1772,15 +1783,29 @@ async function hydrateLiveData() {
   if (page === "reports") await hydrateReports();
 }
 
-async function hydrateStores() {
+async function hydrateStoreRegistry() {
   try {
     const data = await fetchJson("/stores");
-    if (!data.items?.length) return;
+    allStores = (data.items || []).map(mapStoreFromApi);
+    stores = allStores.slice();
+    updateSiteFilterOptions("products");
+    updateStoreFilterOptions("products");
+    updateSiteFilterOptions("reviews");
+    updateStoreFilterOptions("reviews");
+  } catch (error) {
+    allStores = APP_ENV === "demo" ? demoStores.slice() : [];
+    stores = allStores.slice();
+    console.warn("Stores API unavailable", error);
+  }
+}
+
+async function hydrateStores(refreshRegistry = true) {
+  if (refreshRegistry) await hydrateStoreRegistry();
+  try {
     const platform = document.getElementById("stores-platform-filter")?.value || "";
     const status = document.getElementById("stores-status-filter")?.value || "";
     const search = (document.getElementById("stores-search-input")?.value || "").trim().toLowerCase();
-    stores = data.items
-      .map(mapStoreFromApi)
+    stores = allStores
       .filter((item) => !platform || item.platform === platform)
       .filter((item) => !status || item.rawStatus === status)
       .filter((item) => {
@@ -1788,12 +1813,10 @@ async function hydrateStores() {
         return [item.name, item.site, item.seller].some((value) => String(value || "").toLowerCase().includes(search));
       });
     renderStores();
-    updateSiteFilterOptions("products");
-    updateStoreFilterOptions("products");
-    updateSiteFilterOptions("reviews");
-    updateStoreFilterOptions("reviews");
   } catch (error) {
-    console.warn("Stores API unavailable, fallback to mock data", error);
+    stores = [];
+    renderStores();
+    console.warn("Stores filter unavailable", error);
   }
 }
 
@@ -1839,8 +1862,7 @@ async function hydrateProducts() {
     if (siteCode) params.set("site_code", siteCode);
     if (storeName) params.set("store_name", storeName);
     const data = await fetchJson(`/products?${params.toString()}`);
-    if (!data.items?.length) return;
-    products = data.items
+    products = (data.items || [])
       .map(mapProductFromApi)
       .filter((item) => !platform || item.platform === platform)
       .filter((item) => !siteCode || reverseLocalizeSite(item.site) === siteCode)
@@ -1851,7 +1873,9 @@ async function hydrateProducts() {
     renderProducts();
     if (document.body.dataset.page === "dashboard") renderDashboard();
   } catch (error) {
-    console.warn("Products API unavailable, fallback to mock data", error);
+    products = [];
+    renderProducts();
+    console.warn("Products API unavailable", error);
   }
 }
 
@@ -1878,8 +1902,7 @@ async function hydrateReviews() {
     if (siteCode) params.set("site_code", siteCode);
     if (storeName) params.set("store_name", storeName);
     const data = await fetchJson(`/reviews?${params.toString()}`);
-    if (!data.items?.length) return;
-    reviews = mode === "product" ? data.items : data.items.map(mapReviewFromApi);
+    reviews = mode === "product" ? (data.items || []) : (data.items || []).map(mapReviewFromApi);
     if (reviewViewMode === "negative") {
       reviews = reviews.filter((item) => item.stars <= 3);
     }
@@ -1896,7 +1919,9 @@ async function hydrateReviews() {
     renderReviews();
     if (document.body.dataset.page === "dashboard") renderDashboard();
   } catch (error) {
-    console.warn("Reviews API unavailable, fallback to mock data", error);
+    reviews = [];
+    renderReviews();
+    console.warn("Reviews API unavailable", error);
   }
 }
 
@@ -1924,9 +1949,8 @@ async function hydrateComparison() {
       }
     }
     const data = await fetchJson(`/products/compare?${params.toString()}`);
-    if (!data.items?.length) return;
     const siteCodes = selectedComparisonSites();
-    comparisonData = data.items
+    comparisonData = (data.items || [])
       .filter((item) => !siteCodes.length || siteCodes.includes(item.site_code))
       .map(mapComparisonFromApi);
     const note = document.getElementById("comparison-notes");
@@ -1937,7 +1961,9 @@ async function hydrateComparison() {
     }
     renderComparison();
   } catch (error) {
-    console.warn("Comparison API unavailable, fallback to mock data", error);
+    comparisonData = [];
+    renderComparison();
+    console.warn("Comparison API unavailable", error);
   }
 }
 
@@ -1951,7 +1977,9 @@ async function hydrateTasks() {
     renderTasks();
     if (document.body.dataset.page === "dashboard") renderDashboard();
   } catch (error) {
-    console.warn("Supplier tasks API unavailable, fallback to mock data", error);
+    tasks = [];
+    renderTasks();
+    console.warn("Supplier tasks API unavailable", error);
   }
 }
 
@@ -2023,11 +2051,12 @@ async function openTaskEvidenceModal(task) {
 async function hydrateReports() {
   try {
     const data = await fetchJson("/reports?limit=100");
-    if (!data.items?.length) return;
-    reports = data.items.map(mapReportFromApi);
+    reports = (data.items || []).map(mapReportFromApi);
     renderReports();
   } catch (error) {
-    console.warn("Reports API unavailable, fallback to mock data", error);
+    reports = [];
+    renderReports();
+    console.warn("Reports API unavailable", error);
   }
 }
 
@@ -2885,7 +2914,7 @@ function bindIssueTaxonomyManager() {
 }
 
 function storeOptionValues() {
-  return stores.map((item) => ({ value: item.name }));
+  return allStores.map((item) => ({ value: item.name }));
 }
 
 function supplierOptionValues() {
