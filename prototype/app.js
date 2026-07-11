@@ -3301,7 +3301,7 @@ function storeEditorFields() {
     { key: "name", label: "店铺名", required: true },
     { key: "platform", label: "平台", type: "select", options: platformOptions(), required: true },
     { key: "site_code", label: "站点", type: "select", options: siteOptions(), required: true },
-    { key: "country_code", label: "国家代码", required: true },
+    { key: "country_code", label: "国家代码", required: true, disabled: true, hint: "由站点自动带出，不能手工修改。" },
     { key: "seller_identifier", label: "Seller ID / 店铺标识" },
     { key: "store_page_url", label: "店铺链接", full: true },
     { key: "status", label: "状态", type: "select", options: [{ value: "active", label: "启用" }, { value: "paused", label: "暂停" }], required: true },
@@ -3528,7 +3528,7 @@ async function exportSingleReportTable(reportId) {
   if (!reportId) return;
   const data = await fetchJson(`/reports/${reportId}/snapshot`);
   const snapshot = data.snapshot || {};
-  const rows = [
+  const summaryRows = [
     ["报告标题", data.title || ""],
     ["报告类型", data.report_type || ""],
     ["覆盖范围", data.scope || ""],
@@ -3539,7 +3539,24 @@ async function exportSingleReportTable(reportId) {
     ["整改任务数", snapshot.task_total || 0],
     ["未关闭整改任务", snapshot.task_open || 0],
   ];
-  downloadCsv(`report-detail-${reportId}.csv`, [["字段", "值"], ...rows]);
+  const productRows = snapshot.product_rows || [];
+  const reviewRows = snapshot.review_rows || [];
+  if (!productRows.length && !reviewRows.length) {
+    downloadCsv(`report-detail-${reportId}.csv`, [["字段", "值"], ...summaryRows]);
+    return;
+  }
+  const productHeaders = Object.keys(productRows[0] || {});
+  const reviewHeaders = Object.keys(reviewRows[0] || {});
+  const rows = [
+    ["报告摘要"],
+    ...summaryRows,
+    [],
+    ["产品完整明细"],
+    productHeaders,
+    ...productRows.map((row) => productHeaders.map((key) => row[key] ?? "")),
+  ];
+  if (reviewRows.length) rows.push([], ["评论证据明细"], reviewHeaders, ...reviewRows.map((row) => reviewHeaders.map((key) => row[key] ?? "")));
+  downloadCsv(`report-detail-${reportId}.csv`, rows);
 }
 
 function downloadTextFile(filename, content, mimeType) {

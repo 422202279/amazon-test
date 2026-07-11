@@ -89,17 +89,24 @@ def export_report_snapshot(report_id: int, db: Session = Depends(get_db)):
 
 
 def _build_report_content(report_type: str, title: str, scope: str | None, db: Session) -> tuple[str, dict]:
-    product_total = db.query(Product).count()
-    review_total = db.query(Review).count()
-    negative_total = db.query(Review).filter(Review.is_negative_review.is_(True)).count()
+    site_codes = _scope_site_codes(scope)
+    product_query = db.query(Product)
+    review_query = db.query(Review)
+    if site_codes:
+        product_query = product_query.filter(Product.site_code.in_(site_codes))
+        review_query = review_query.filter(Review.site_code.in_(site_codes))
+    product_total = product_query.count()
+    review_total = review_query.count()
+    negative_total = review_query.filter(Review.is_negative_review.is_(True)).count()
     task_total = db.query(SupplierTask).count()
     task_open = db.query(SupplierTask).filter(SupplierTask.status.in_(["pending_feedback", "in_progress", "observing"])).count()
 
-    latest_products = db.query(Product).order_by(Product.updated_at.desc(), Product.id.desc()).limit(5).all()
-    latest_reviews = db.query(Review).order_by(Review.reviewed_at.desc(), Review.id.desc()).limit(5).all()
+    report_products = product_query.order_by(Product.site_code, Product.store_name, Product.asin, Product.id).all()
+    latest_products = report_products[:20]
+    latest_reviews = review_query.order_by(Review.reviewed_at.desc(), Review.id.desc()).limit(20).all()
     latest_tasks = db.query(SupplierTask).order_by(SupplierTask.updated_at.desc(), SupplierTask.id.desc()).limit(5).all()
     issue_rows = (
-        db.query(Review.issue_category, func.count(Review.id))
+        review_query.with_entities(Review.issue_category, func.count(Review.id))
         .filter(Review.is_negative_review.is_(True))
         .group_by(Review.issue_category)
         .order_by(func.count(Review.id).desc())
@@ -116,6 +123,8 @@ def _build_report_content(report_type: str, title: str, scope: str | None, db: S
         "negative_total": negative_total,
         "task_total": task_total,
         "task_open": task_open,
+        "product_rows": [_product_export_row(item) for item in report_products],
+        "review_rows": [_review_export_row(item) for item in latest_reviews],
     }
 
     lines = [
@@ -133,7 +142,7 @@ def _build_report_content(report_type: str, title: str, scope: str | None, db: S
         f"- 整改任务数：{task_total}",
         f"- 未关闭整改任务：{task_open}",
         "",
-        "## 产品指标表",
+        "## 产品指标表（前20条，完整明细见表格导出）",
         "",
     ]
     if latest_products:
@@ -180,3 +189,51 @@ def _build_report_content(report_type: str, title: str, scope: str | None, db: S
         "- 深度结论、图片摘要、AI分析可作为后续增强项补入。",
     ])
     return "\n".join(lines), snapshot
+
+
+def _scope_site_codes(scope: str | None) -> list[str]:
+    labels = {"美国": "US", "英国": "UK", "德国": "DE", "日本": "JP", "加拿大": "CA", "法国": "FR", "韩国": "KR"}
+    return [code for label, code in labels.items() if label in (scope or "")]
+
+
+def _product_export_row(item: Product) -> dict:
+    return {
+        "平台": item.platform,
+        "站点": item.site_code,
+        "店铺": item.store_name or "",
+        "ASIN": item.asin or "",
+        "SKU": item.sku or "",
+        "产品标题": item.title,
+        "品牌": item.brand or "",
+        "类目": item.category_name or item.category_path or "",
+        "价格": item.price_amount,
+        "币种": item.price_currency or "",
+        "近30天销量": item.monthly_sales,
+        "近30天销售额": item.monthly_revenue,
+        "评分": item.rating,
+        "Review总数": item.review_count,
+        "大类BSR": item.bsr_main,
+        "小类BSR": item.bsr_sub,
+        "变体数": item.variation_count,
+        "尺寸": item.size_text or "",
+        "重量": item.weight_text or "",
+        "产品链接": item.product_url or "",
+        "数据来源": item.source_file or "",
+        "更新时间": item.updated_at.isoformat(sep=" ", timespec="seconds") if item.updated_at else "",
+    }
+
+
+def _review_export_row(item: Review) -> dict:
+    return {
+        "平台": item.platform,
+        "站点": item.site_code,
+        "店铺": item.store_name or "",
+        "ASIN": item.asin or "",
+        "产品标题": item.product_title or "",
+        "星级": item.star_rating,
+        "评论时间": item.reviewed_at.isoformat(sep=" ", timespec="seconds") if item.reviewed_at else "",
+        "评论人": item.reviewer_name or "",
+        "评论内容": item.review_content or "",
+        "问题分类": item.issue_category or "",
+        "评论链接": item.review_url or "",
+    }
