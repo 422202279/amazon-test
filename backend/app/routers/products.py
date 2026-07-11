@@ -22,6 +22,15 @@ from app.services.translation_helper import suggest_cn_title
 
 router = APIRouter(prefix="/products", tags=["products"])
 
+PRODUCT_DATA_FIELDS = (
+    "department_item_no", "asin", "sku", "parent_asin", "title", "localized_title", "brand",
+    "category_name", "category_path", "product_url", "image_url", "price_amount", "price_currency",
+    "monthly_sales", "monthly_revenue", "review_count", "rating", "qa_count", "variation_count",
+    "seller_count", "buybox_seller", "fulfillment_type", "launch_date", "keyword_total",
+    "keyword_organic", "keyword_ads", "bsr_main", "bsr_sub", "weight_text", "size_text",
+    "package_weight_text", "package_size_text", "supplier_name", "supplier_factory", "status",
+)
+
 
 class ProductPayload(BaseModel):
     platform: str
@@ -61,6 +70,28 @@ class ProductPayload(BaseModel):
     supplier_name: str | None = None
     supplier_factory: str | None = None
     status: str | None = None
+
+
+def _serialize_product(product: Product) -> dict:
+    payload = to_dict(product)
+    source = product.source_file or "人工维护"
+    field_availability = {}
+    for field_name in PRODUCT_DATA_FIELDS:
+        value = getattr(product, field_name)
+        available = value is not None and value != ""
+        field_availability[field_name] = {
+            "available": available,
+            "source": source,
+            "reason": None if available else "当前导入来源未提供该字段",
+        }
+    payload["field_availability"] = field_availability
+    payload["data_completeness"] = {
+        "available_fields": sum(1 for item in field_availability.values() if item["available"]),
+        "tracked_fields": len(field_availability),
+        "source": source,
+        "updated_at": payload.get("updated_at"),
+    }
+    return payload
 
 
 @router.get("")
@@ -106,7 +137,7 @@ def list_products(
         )
     total = query.count()
     items = query.order_by(Product.updated_at.desc(), Product.id.desc()).offset(offset).limit(limit).all()
-    return {"items": [to_dict(item) for item in items], "total": total, "offset": offset, "limit": limit}
+    return {"items": [_serialize_product(item) for item in items], "total": total, "offset": offset, "limit": limit}
 
 
 @router.post("")
@@ -231,22 +262,24 @@ def compare_products(
     payload = []
     for item in items:
         stats = review_stats.get(item.asin)
-        negative_total = int(stats.negative_total or 0) if stats else 0
-        review_total = int(stats.review_total or 0) if stats else (item.review_count or 0)
+        has_review_evidence = stats is not None
+        negative_total = int(stats.negative_total or 0) if has_review_evidence else None
+        review_total = int(stats.review_total or 0) if has_review_evidence else (item.review_count or 0)
         top_issues = " / ".join(
             issue
             for issue, _ in sorted(issue_stats.get(item.asin, []), key=lambda pair: pair[1], reverse=True)[:3]
         )
         payload.append(
             {
-                **to_dict(item),
+                **_serialize_product(item),
                 "recent_sales": item.monthly_sales,
                 "recent_revenue": item.monthly_revenue,
                 "review_total": review_total,
                 "negative_review_total": negative_total,
-                "negative_ratio": round((negative_total / review_total) * 100, 2) if review_total else None,
-                "image_review_total": int(stats.image_total or 0) if stats else None,
-                "top_issue_summary": top_issues or None,
+                "negative_ratio": round((negative_total / review_total) * 100, 2) if has_review_evidence and review_total else None,
+                "image_review_total": int(stats.image_total or 0) if has_review_evidence else None,
+                "top_issue_summary": top_issues or None if has_review_evidence else None,
+                "review_data_status": "available" if has_review_evidence else "missing",
             }
         )
     return {

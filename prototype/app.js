@@ -583,6 +583,7 @@ function renderProductCell(item, key) {
         <div>
           <span class="cell-title">${item.productUrl ? `<a class="link-inline" href="${item.productUrl}" target="_blank" rel="noreferrer">${item.name}</a>` : item.name}</span>
           <span class="cell-sub">${item.asin} · ${item.sku}</span>
+          <span class="cell-sub">字段覆盖 ${item.availableFields}/${item.trackedFields} · 来源 ${item.dataSource}</span>
         </div>
       </div>
     `,
@@ -614,6 +615,16 @@ function renderProductCell(item, key) {
     rectify: `<span class="status ${statusClass(item.rectify)}">${item.rectify}</span>`,
   };
   return cells[key] ?? "";
+}
+
+function comparisonMetric(value, suffix = "") {
+  return value === null || value === undefined || value === "" || value === "-" ? "待导入" : `${value}${suffix}`;
+}
+
+function comparisonBarWidth(value, scale = 1) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.max(12, Math.min(100, numeric * scale));
 }
 
 function sortedSelectionState(items) {
@@ -909,9 +920,9 @@ function renderComparison() {
         <div><span class="cell-sub">${periodLabel}销量</span><strong>${item.sales}</strong></div>
         <div><span class="cell-sub">${periodLabel}销售额</span><strong>${item.salesAmount}</strong></div>
         <div><span class="cell-sub">评分</span><strong>${item.score}</strong></div>
-        <div><span class="cell-sub">差评占比</span><strong>${item.negative}%</strong></div>
+        <div><span class="cell-sub">差评占比</span><strong>${comparisonMetric(item.negative, "%")}</strong></div>
         <div><span class="cell-sub">评论总数</span><strong>${item.volume}</strong></div>
-        <div><span class="cell-sub">带图评论</span><strong>${item.imageReviews}</strong></div>
+        <div><span class="cell-sub">带图评论</span><strong>${comparisonMetric(item.imageReviews)}</strong></div>
       </div>
     </article>
   `).join("");
@@ -919,18 +930,18 @@ function renderComparison() {
   const maxVolume = Math.max(...sortedComparison.map((i) => Number(i.volume) || 0), 1);
   if (comparisonViewMode === "sales") {
     scoreBars.innerHTML = sortedComparison.map((item) => `<div class="bar-item"><span>${item.store}</span><div><i style="width:${Math.max(12, item.score * 20)}%"></i></div><strong>${item.score}</strong></div>`).join("");
-    negativeBars.innerHTML = sortedComparison.map((item) => `<div class="bar-item"><span>${item.store}</span><div><i style="width:${Math.max(12, item.negative * 7)}%"></i></div><strong>${item.negative}%</strong></div>`).join("");
+    negativeBars.innerHTML = sortedComparison.map((item) => `<div class="bar-item"><span>${item.store}</span><div><i style="width:${comparisonBarWidth(item.negative, 7)}%"></i></div><strong>${comparisonMetric(item.negative, "%")}</strong></div>`).join("");
     volumeBars.innerHTML = sortedComparison.map((item) => `<div class="bar-item"><span>${item.store}</span><div><i style="width:${(item.volume / maxVolume) * 100}%"></i></div><strong>${item.volume}</strong></div>`).join("");
     issueGrid.innerHTML = issueNotes.map(([issue, note]) => `<div class="issue-pill"><strong>${issue}</strong><span>${note}</span></div>`).join("");
   } else if (comparisonViewMode === "reviews") {
-    scoreBars.innerHTML = sortedComparison.map((item) => `<div class="bar-item"><span>${item.store}</span><div><i style="width:${Math.max(12, item.imageReviews * 2)}%"></i></div><strong>${item.imageReviews}</strong></div>`).join("");
-    negativeBars.innerHTML = sortedComparison.map((item) => `<div class="bar-item"><span>${item.store}</span><div><i style="width:${Math.max(12, item.negative * 7)}%"></i></div><strong>${item.negative}%</strong></div>`).join("");
+    scoreBars.innerHTML = sortedComparison.map((item) => `<div class="bar-item"><span>${item.store}</span><div><i style="width:${comparisonBarWidth(item.imageReviews, 2)}%"></i></div><strong>${comparisonMetric(item.imageReviews)}</strong></div>`).join("");
+    negativeBars.innerHTML = sortedComparison.map((item) => `<div class="bar-item"><span>${item.store}</span><div><i style="width:${comparisonBarWidth(item.negative, 7)}%"></i></div><strong>${comparisonMetric(item.negative, "%")}</strong></div>`).join("");
     volumeBars.innerHTML = sortedComparison.map((item) => `<div class="bar-item"><span>${item.store}</span><div><i style="width:${(item.volume / maxVolume) * 100}%"></i></div><strong>${item.volume}</strong></div>`).join("");
     issueGrid.innerHTML = issueNotes.map(([issue, note]) => `<div class="issue-pill"><strong>${issue}</strong><span>${note}</span></div>`).join("");
   } else {
     scoreBars.innerHTML = sortedComparison.map((item) => `<div class="bar-item"><span>${item.store}</span><div><i style="width:${Math.max(12, item.sales / Math.max(...sortedComparison.map((row) => Number(row.sales) || 0), 1) * 100)}%"></i></div><strong>${item.sales}</strong></div>`).join("");
     negativeBars.innerHTML = sortedComparison.map((item) => `<div class="bar-item"><span>${item.store}</span><div><i style="width:${Math.max(12, item.score * 20)}%"></i></div><strong>${item.score}</strong></div>`).join("");
-    volumeBars.innerHTML = sortedComparison.map((item) => `<div class="bar-item"><span>${item.store}</span><div><i style="width:${Math.max(12, item.negative * 7)}%"></i></div><strong>${item.negative}%</strong></div>`).join("");
+    volumeBars.innerHTML = sortedComparison.map((item) => `<div class="bar-item"><span>${item.store}</span><div><i style="width:${comparisonBarWidth(item.negative, 7)}%"></i></div><strong>${comparisonMetric(item.negative, "%")}</strong></div>`).join("");
     issueGrid.innerHTML = sortedComparison.map((item) => `<div class="issue-pill"><strong>${item.store}</strong><span>${periodLabel}建议：${item.action}</span></div>`).join("");
   }
 
@@ -941,7 +952,7 @@ function renderComparison() {
       <td>${item.sales}</td>
       <td>${item.salesAmount}</td>
       <td>${item.score}</td>
-      <td>${item.negative}%</td>
+      <td>${comparisonMetric(item.negative, "%")}</td>
       <td>${item.volume}</td>
       <td>${item.imageReviews}</td>
       <td>${item.top3}</td>
@@ -4026,6 +4037,9 @@ function mapProductFromApi(item) {
     launchDate: item.launch_date || "-",
     rectify: item.status || "待补",
     updatedAt: item.updated_at || "",
+    availableFields: item.data_completeness?.available_fields ?? 0,
+    trackedFields: item.data_completeness?.tracked_fields ?? 0,
+    dataSource: item.data_completeness?.source || item.source_file || "待补来源",
   };
 }
 
@@ -4087,10 +4101,11 @@ function mapComparisonFromApi(item) {
     sales: item.recent_sales ?? "-",
     salesAmount: item.recent_revenue ? `${item.price_currency || ""}${item.recent_revenue}` : "-",
     score: item.rating ?? "-",
-    negative: item.negative_ratio ?? 0,
+    negative: item.negative_ratio,
     volume: item.review_total ?? item.review_count ?? 0,
     imageReviews: item.image_review_total ?? "-",
-    top3: item.top_issue_summary || item.supplier_name || item.category_name || "待补评论问题",
+    top3: item.top_issue_summary || (item.review_data_status === "missing" ? "待导入真实评论" : "暂无问题分类"),
+    reviewDataStatus: item.review_data_status || "missing",
     action: item.buybox_seller ? `关注 ${item.buybox_seller}` : "待生成建议动作",
   };
 }

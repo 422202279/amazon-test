@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
-from app.config import allowed_cors_origins, settings
+from app.config import PROJECT_ROOT, allowed_cors_origins, settings
 from app.database import Base, engine, ensure_lightweight_migrations
 from app.routers.admin import router as admin_router
 from app.routers.auth import router as auth_router
@@ -40,4 +41,5 @@ def create_app() -> FastAPI:
     app.include_router(metrics_router, prefix=settings.api_prefix)
     app.include_router(ops_router, prefix=settings.api_prefix)
     app.include_router(admin_router, prefix=settings.api_prefix)
+    app.mount("/", StaticFiles(directory=str(PROJECT_ROOT / "prototype"), html=True), name="frontend")
     return app

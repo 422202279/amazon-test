@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.config import settings
 from app.database import Base
+from app.main import create_app
 from app.models.user_account import UserAccount
 from app.routers.health import health_detail
 from app.routers.admin import (
@@ -40,6 +41,11 @@ class OpsAdminTests(unittest.TestCase):
         amazon = next(item for item in payload["items"] if item["platform"] == "Amazon")
         self.assertTrue(amazon["cloud_ready"])
         self.assertEqual(amazon["automation_level"], "半自动")
+
+    def test_application_serves_static_frontend_from_same_origin(self):
+        app = create_app()
+
+        self.assertTrue(any(route.name == "frontend" for route in app.routes))
 
     def test_deployment_profile_returns_minimum_server_guidance(self):
         payload = deployment_profile()
