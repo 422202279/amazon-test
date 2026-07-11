@@ -16,6 +16,7 @@ from app.models.review import Review
 from app.models.supplier_task import SupplierTask
 from app.services.review_importer import (
     import_reviews_from_workbook,
+    normalize_review_row,
     preview_reviews_from_workbook,
 )
 from app.services.supplier_tasks import generate_tasks_from_negative_reviews
@@ -70,6 +71,28 @@ class ReviewWorkflowTests(unittest.TestCase):
         self.assertEqual(rows[0]["issue_category"], "尺寸问题")
         self.assertTrue(rows[0]["has_images"])
         self.assertTrue(rows[0]["is_negative_review"])
+
+    def test_sellersprite_review_columns_keep_media_country_and_review_id(self):
+        row = pd.Series({
+            "ASIN": "B0CHJ55J9G",
+            "标题": "Stopped charging",
+            "内容": "It quit charging after six months.",
+            "VP评论": "Y",
+            "星级": 1,
+            "是否有视频": "Y",
+            "视频地址": "https://media.example.com/review.mp4",
+            "评论链接": "https://www.amazon.com/gp/customer-reviews/R123ABC",
+            "评论人": "Glenn",
+            "所属国家": "US",
+            "评论时间": "2026-06-16",
+        })
+        item = normalize_review_row(row, "B0CHJ55J9G-CA-Reviews-20260711.xlsx")
+
+        self.assertEqual(item.site_code, "CA")
+        self.assertEqual(item.review_external_id, "R123ABC")
+        self.assertTrue(item.has_images)
+        self.assertEqual(item.review_images, "https://media.example.com/review.mp4")
+        self.assertEqual(item.issue_category, "质量问题")
 
     def test_import_reviews_and_generate_supplier_tasks(self):
         with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:

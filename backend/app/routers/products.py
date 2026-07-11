@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.product import Product
+from app.models.product_metric import ProductMetricHistory
 from app.models.review import Review
 from app.models.user_account import UserAccount
 from app.serializers import to_dict
@@ -72,8 +73,12 @@ class ProductPayload(BaseModel):
     status: str | None = None
 
 
-def _serialize_product(product: Product) -> dict:
+def _serialize_product(product: Product, period_metrics: dict | None = None) -> dict:
     payload = to_dict(product)
+    if period_metrics:
+        payload["monthly_sales"] = period_metrics.get("monthly_sales", payload.get("monthly_sales"))
+        payload["monthly_revenue"] = period_metrics.get("monthly_revenue", payload.get("monthly_revenue"))
+        payload["price_amount"] = period_metrics.get("monthly_price", payload.get("price_amount"))
     source = product.source_file or "人工维护"
     field_availability = {}
     for field_name in PRODUCT_DATA_FIELDS:
@@ -103,6 +108,7 @@ def list_products(
     platform: str | None = None,
     site_code: str | None = None,
     store_name: str | None = None,
+    period: str = "30d",
     db: Session = Depends(get_db),
 ):
     query = db.query(Product)
@@ -137,7 +143,32 @@ def list_products(
         )
     total = query.count()
     items = query.order_by(Product.updated_at.desc(), Product.id.desc()).offset(offset).limit(limit).all()
-    return {"items": [_serialize_product(item) for item in items], "total": total, "offset": offset, "limit": limit}
+    metrics = _period_metrics(db, items, period)
+    return {"items": [_serialize_product(item, metrics.get((item.site_code, item.asin))) for item in items], "total": total, "offset": offset, "limit": limit}
+
+
+def _period_metrics(db: Session, products: list[Product], period: str) -> dict[tuple[str, str | None], dict]:
+    month_count = {"30d": 1, "60d": 2, "90d": 3, "180d": 6, "365d": 12}.get(period)
+    if not month_count:
+        return {}
+    pairs = {(item.site_code, item.asin) for item in products if item.asin}
+    if not pairs:
+        return {}
+    rows = db.query(ProductMetricHistory).filter(ProductMetricHistory.metric_type.in_(["monthly_sales", "monthly_revenue", "monthly_price"])).all()
+    grouped: dict[tuple[str, str | None, str], list[ProductMetricHistory]] = {}
+    for row in rows:
+        if (row.site_code, row.asin) not in pairs:
+            continue
+        grouped.setdefault((row.site_code, row.asin, row.metric_type), []).append(row)
+    result: dict[tuple[str, str | None], dict] = {}
+    for (site_code, asin, metric_type), values in grouped.items():
+        latest = sorted(values, key=lambda item: item.metric_month, reverse=True)[:month_count]
+        bucket = result.setdefault((site_code, asin), {})
+        if metric_type == "monthly_price":
+            bucket[metric_type] = latest[0].metric_value if latest else None
+        else:
+            bucket[metric_type] = sum(item.metric_value or 0 for item in latest)
+    return result
 
 
 @router.post("")

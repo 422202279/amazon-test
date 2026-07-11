@@ -1,6 +1,8 @@
 from datetime import datetime
+from pathlib import Path
+from tempfile import NamedTemporaryFile
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -223,6 +225,40 @@ def import_reviews(
     )
     db.commit()
     return {"source": "generic_review_import", "quality": quality, **result}
+
+
+@router.post("/upload")
+async def upload_reviews(
+    file: UploadFile = File(...),
+    sheet_name: str | None = None,
+    limit: int = 5000,
+    db: Session = Depends(get_db),
+    _: UserAccount = Depends(get_current_user),
+):
+    suffix = Path(file.filename or "").suffix.lower()
+    if suffix not in {".xlsx", ".xls"}:
+        raise HTTPException(status_code=422, detail="请上传 .xlsx 或 .xls 评论导出文件。")
+    with NamedTemporaryFile(suffix=suffix, delete=False) as temp:
+        temp.write(await file.read())
+        temp_path = Path(temp.name)
+    try:
+        source_name = file.filename or "uploaded-review-export"
+        preview_rows = preview_reviews_from_workbook(temp_path, sheet_name, limit, source_name)
+        quality = validate_review_rows(preview_rows)
+        result = import_reviews_from_workbook(db, temp_path, sheet_name, limit, source_name)
+    finally:
+        temp_path.unlink(missing_ok=True)
+    create_import_job(
+        db,
+        import_type="uploaded_review_export",
+        source_name=file.filename or "uploaded-review-export",
+        total_rows=quality["total_rows"],
+        success_rows=result["created"] + result["updated"],
+        warning_rows=quality["warning_rows"],
+        issue_summary=quality,
+    )
+    db.commit()
+    return {"source": "uploaded_review_export", "quality": quality, **result}
 
 
 def _serialize_review(review: Review, task: SupplierTask | None) -> dict:

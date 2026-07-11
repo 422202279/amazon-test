@@ -20,6 +20,7 @@ from app.services.product_importer import (
     import_internal_store_links,
     import_sellersprite_sales_history,
     preview_internal_store_links,
+    preview_sellersprite_products,
     preview_sellersprite_sales_history,
 )
 from app.services.query_helpers import split_identifier_terms
@@ -27,6 +28,7 @@ from app.services.query_helpers import split_identifier_terms
 
 INTERNAL_WORKBOOK = "/Users/jcc_mac/Documents/A新禾亚马逊一部/产品信息汇总表 新系统一些SKU加点版本_在售版本汇总.xlsx"
 SELLERSPRITE_HISTORY_WORKBOOK = "/Users/jcc_mac/Downloads/product-CA-sales-20260702-71124.xlsx"
+SELLERSPRITE_UK_WORKBOOK = "/Users/jcc_mac/Documents/Codex项目/卖家精灵原始数据汇总/新禾亚马逊一部店铺产品卖家精灵数据/20260703/Product-UK-20260703.xlsx"
 
 
 class ImporterTests(unittest.TestCase):
@@ -61,6 +63,13 @@ class ImporterTests(unittest.TestCase):
         self.assertIn(first["metric_type"], {"monthly_sales", "monthly_revenue", "monthly_price"})
         self.assertIsNotNone(first["metric_month"])
         self.assertIsNotNone(first["asin"])
+
+    def test_sellersprite_non_ca_currency_columns_are_imported(self):
+        row = preview_sellersprite_products(SELLERSPRITE_UK_WORKBOOK, limit=1)[0]
+
+        self.assertEqual(row["site_code"], "UK")
+        self.assertEqual(row["price_currency"], "GBP")
+        self.assertIsNotNone(row["price_amount"])
 
     def test_import_internal_store_links_persists_store_rows(self):
         with self.session_factory() as db:

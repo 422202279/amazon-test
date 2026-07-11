@@ -1564,6 +1564,7 @@ function bindCrudActions() {
   bindStoreCreate();
   bindProductCreate();
   bindReviewCreate();
+  bindReviewImport();
   bindReviewUtilityActions();
   bindTaskCreate();
   bindAccountCreate();
@@ -1911,6 +1912,8 @@ async function hydrateProducts() {
     const buybox = document.getElementById("products-buybox-filter")?.value || "";
     const rectify = document.getElementById("products-rectify-filter")?.value || "";
     const risk = document.getElementById("products-risk-filter")?.value || "";
+    const period = document.getElementById("products-period-filter")?.value || "all";
+    params.set("period", period);
     if (platform) params.set("platform", platform);
     if (siteCode) params.set("site_code", siteCode);
     if (storeName) params.set("store_name", storeName);
@@ -2405,6 +2408,32 @@ function bindReviewCreate() {
   button.addEventListener("click", async () => {
     openReviewEditor();
   });
+}
+
+function bindReviewImport() {
+  const button = document.getElementById("reviews-import-button");
+  const fileInput = document.getElementById("reviews-import-file");
+  if (!button || !fileInput) return;
+  button.onclick = () => fileInput.click();
+  fileInput.onchange = async () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    const form = new FormData();
+    form.append("file", file);
+    button.disabled = true;
+    button.textContent = "导入中...";
+    try {
+      const result = await fetchJson("/reviews/upload", { method: "POST", body: form });
+      await hydrateReviews();
+      alert(`真实评论已导入：新增 ${result.created || 0} 条，更新 ${result.updated || 0} 条。`);
+    } catch (error) {
+      alert(`评论导入失败：${error.message}`);
+    } finally {
+      button.disabled = false;
+      button.textContent = "导入评论文件";
+      fileInput.value = "";
+    }
+  };
 }
 
 function bindTaskCreate() {

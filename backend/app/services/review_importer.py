@@ -1,4 +1,5 @@
 import json
+import re
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
@@ -8,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.review import Review
+from app.models.product import Product
 from app.services.translation_helper import suggest_cn_summary
 
 
@@ -42,19 +44,30 @@ class NormalizedReviewRow:
     reviewed_at: datetime | None
 
 
-def preview_reviews_from_workbook(path: str | Path, sheet_name: str | None = None, limit: int = 20) -> list[dict]:
+def preview_reviews_from_workbook(path: str | Path, sheet_name: str | None = None, limit: int = 20, source_file_name: str | None = None) -> list[dict]:
     with pd.ExcelFile(path) as workbook:
         target_sheet = sheet_name or workbook.sheet_names[0]
     df = pd.read_excel(path, sheet_name=target_sheet)
-    rows = [normalize_review_row(row, Path(path).name) for _, row in df.head(limit).iterrows()]
+    source_file = source_file_name or Path(path).name
+    rows = [normalize_review_row(row, source_file) for _, row in df.head(limit).iterrows()]
     return [asdict(row) for row in rows]
 
 
-def import_reviews_from_workbook(db: Session, path: str | Path, sheet_name: str | None = None, limit: int = 200) -> dict[str, int]:
-    rows = preview_reviews_from_workbook(path, sheet_name, limit)
+def import_reviews_from_workbook(db: Session, path: str | Path, sheet_name: str | None = None, limit: int = 200, source_file_name: str | None = None) -> dict[str, int]:
+    source_file = source_file_name or Path(path).name
+    rows = preview_reviews_from_workbook(path, sheet_name, limit, source_file)
+    source_asin = _asin_from_filename(source_file)
+    source_product = None
+    if source_asin:
+        source_product = db.execute(select(Product).where(Product.asin == source_asin)).scalar_one_or_none()
     created = 0
     updated = 0
     for row in rows:
+        if source_product:
+            row["product_title"] = row.get("product_title") or source_product.title
+            row["store_name"] = row.get("store_name") or source_product.store_name
+            row["product_url"] = row.get("product_url") or source_product.product_url
+            row["site_code"] = row.get("site_code") or source_product.site_code
         existing = db.execute(
             select(Review).where(
                 Review.platform == row["platform"],
@@ -75,36 +88,41 @@ def import_reviews_from_workbook(db: Session, path: str | Path, sheet_name: str 
 
 
 def normalize_review_row(row: pd.Series, source_file: str) -> NormalizedReviewRow:
-    images_text = _safe_text(row.get("评论图片"))
-    star_rating = _coerce_int(row.get("星级"))
+    images_text = _value(row, "评论图片", "图片地址")
+    video_url = _value(row, "视频地址")
+    has_video = _coerce_bool(_value(row, "是否有视频")) is True
+    media_text = video_url if has_video and video_url else images_text
+    if has_video and not media_text:
+        media_text = "video"
+    star_rating = _coerce_int(_value(row, "星级"))
     return NormalizedReviewRow(
-        platform=_safe_text(row.get("平台")) or "Amazon",
-        site_code=_safe_text(row.get("站点")) or "US",
-        store_name=_safe_text(row.get("店铺")),
-        asin=_safe_text(row.get("ASIN")),
-        product_title=_safe_text(row.get("产品标题")),
-        review_external_id=_safe_text(row.get("评论ID")),
-        review_url=_safe_text(row.get("评论链接")),
-        product_url=_safe_text(row.get("产品链接")),
+        platform=_value(row, "平台") or "Amazon",
+        site_code=_value(row, "站点") or _site_from_filename(source_file) or "US",
+        store_name=_value(row, "店铺"),
+        asin=_value(row, "ASIN"),
+        product_title=_value(row, "产品标题", "商品标题"),
+        review_external_id=_value(row, "评论ID") or _review_id_from_url(_value(row, "评论链接")),
+        review_url=_value(row, "评论链接"),
+        product_url=_value(row, "产品链接"),
         star_rating=star_rating,
-        review_title=_safe_text(row.get("评论标题")),
-        review_content=_safe_text(row.get("评论内容")),
-        review_images=images_text,
-        reviewer_name=_safe_text(row.get("评论人")),
-        review_country=_safe_text(row.get("评论国家")),
-        review_language=_safe_text(row.get("评论语言")),
-        is_verified_purchase=_coerce_bool(row.get("是否Verified Purchase")),
-        helpful_count=_coerce_int(row.get("点赞数")),
-        has_images=bool(images_text),
+        review_title=_value(row, "评论标题", "标题"),
+        review_content=_value(row, "评论内容", "内容"),
+        review_images=media_text,
+        reviewer_name=_value(row, "评论人"),
+        review_country=_value(row, "评论国家", "所属国家"),
+        review_language=_value(row, "评论语言"),
+        is_verified_purchase=_coerce_bool(_value(row, "是否Verified Purchase", "VP评论")),
+        helpful_count=_coerce_int(_value(row, "点赞数", "赞同数")),
+        has_images=bool(images_text or has_video),
         is_negative_review=bool(star_rating and star_rating <= 3),
-        issue_category=_safe_text(row.get("问题分类")),
-        sentiment=_safe_text(row.get("情绪")),
-        feedback_to_supplier=_coerce_bool(row.get("是否反馈供应商")) or False,
-        rectification_status=_safe_text(row.get("整改状态")),
-        source_type="manual_import",
+        issue_category=_value(row, "问题分类") or _infer_issue_category(_value(row, "标题", "评论标题"), _value(row, "内容", "评论内容")),
+        sentiment=_value(row, "情绪") or ("负面" if star_rating and star_rating <= 3 else "正面" if star_rating and star_rating >= 4 else "中性"),
+        feedback_to_supplier=_coerce_bool(_value(row, "是否反馈供应商")) or False,
+        rectification_status=_value(row, "整改状态"),
+        source_type="sellersprite_review_export" if "Reviews" in source_file else "manual_import",
         source_file=source_file,
         raw_payload=json.dumps(_normalize_payload(row), ensure_ascii=False),
-        reviewed_at=_coerce_datetime(row.get("评论时间")),
+        reviewed_at=_coerce_datetime(_value(row, "评论时间")),
     )
 
 
@@ -171,6 +189,44 @@ def _safe_text(value) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def _value(row: pd.Series, *keys: str) -> str | None:
+    for key in keys:
+        value = _safe_text(row.get(key))
+        if value is not None:
+            return value
+    return None
+
+
+def _site_from_filename(source_file: str) -> str | None:
+    match = re.search(r"-(US|UK|DE|JP|CA|FR|KR)-Reviews", source_file, re.I)
+    return match.group(1).upper() if match else None
+
+
+def _asin_from_filename(source_file: str) -> str | None:
+    match = re.search(r"([A-Z0-9]{10})-[A-Z]{2}-Reviews", source_file, re.I)
+    return match.group(1).upper() if match else None
+
+
+def _review_id_from_url(url: str | None) -> str | None:
+    match = re.search(r"customer-reviews/([A-Z0-9]+)", url or "", re.I)
+    return match.group(1).upper() if match else None
+
+
+def _infer_issue_category(title: str | None, content: str | None) -> str:
+    text = f"{title or ''} {content or ''}".lower()
+    rules = [
+        ("质量问题", ("broke", "broken", "quit", "corrod", "quality", "charge", "damaged", "坏", "损坏")),
+        ("尺寸问题", ("small", "large", "size", "尺寸")),
+        ("异味", ("smell", "odor", "odour", "味")),
+        ("包装破损", ("package", "packaging", "box", "包装")),
+        ("使用效果差", ("doesn't work", "not work", "weak", "stuck", "效果")),
+    ]
+    for category, keywords in rules:
+        if any(keyword in text for keyword in keywords):
+            return category
+    return "待分类"
 
 
 def _normalize_payload(row: pd.Series) -> dict:

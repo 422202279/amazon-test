@@ -359,10 +359,10 @@ def normalize_sellersprite_row(row: pd.Series, source_file: str) -> NormalizedPr
         category_name=_safe_text(row.get("小类目") or row.get("大类目")),
         product_url=url,
         image_url=_safe_text(row.get("商品主图")),
-        price_amount=_coerce_float(row.get("价格(CDN$)")),
+        price_amount=_first_prefixed_number(row, "价格("),
         price_currency=_detect_currency_from_columns(row.index),
         monthly_sales=_coerce_int(row.get("月销量")),
-        monthly_revenue=_coerce_float(row.get("月销售额(CDN$)")),
+        monthly_revenue=_first_prefixed_number(row, "月销售额("),
         review_count=_coerce_int(row.get("评分数")),
         rating=_coerce_float(row.get("评分")),
         qa_count=_coerce_int(row.get("Q&A")),
@@ -529,8 +529,15 @@ def _detect_currency(text: str | None) -> str | None:
 
 def _detect_currency_from_columns(columns) -> str | None:
     columns_text = " ".join(map(str, columns))
-    if "CDN$" in columns_text:
-        return "CAD"
+    return _detect_currency(columns_text)
+
+
+def _first_prefixed_number(row: pd.Series, prefix: str) -> float | None:
+    for column in row.index:
+        if str(column).startswith(prefix):
+            value = _coerce_float(row.get(column))
+            if value is not None:
+                return value
     return None
 
 
@@ -573,6 +580,25 @@ def _upsert_products(db: Session, rows: list[dict]) -> dict[str, int]:
     created = 0
     updated = 0
     for row in rows:
+        # SellerSprite exports expose the current BuyBox seller, not the company
+        # store identity.  Merge by site + ASIN into existing internal-store rows
+        # so the real store attribution is retained and no duplicate listing is made.
+        if str(row.get("source_file") or "").startswith("Product-") and row.get("asin"):
+            matches = db.execute(
+                select(Product).where(
+                    Product.platform == row["platform"],
+                    Product.site_code == row["site_code"],
+                    Product.asin == row["asin"],
+                )
+            ).scalars().all()
+            if matches:
+                for existing in matches:
+                    existing_store_name = existing.store_name
+                    _apply_product_row(existing, row)
+                    if existing_store_name:
+                        existing.store_name = existing_store_name
+                updated += len(matches)
+                continue
         existing = db.execute(
             select(Product).where(
                 Product.platform == row["platform"],
