@@ -41,6 +41,7 @@ const dashboardNewsPageSize = 4;
 let comparisonViewMode = "sales";
 let reportFilterMode = "all";
 let taskStatusFilter = "all";
+let taskProductCatalogLoaded = false;
 const selectedProductRecordIds = new Set();
 const RECENT_TASK_CODES_KEY = "cb-recent-generated-task-codes";
 
@@ -911,11 +912,18 @@ function renderComparison() {
   const sortedComparison = applySort(comparisonData, comparisonSortState, getComparisonSortValue);
   const issueNotes = buildComparisonIssueNotes(sortedComparison);
   const periodLabel = document.getElementById("comparison-period")?.selectedOptions?.[0]?.textContent || "近30天";
+  const heading = document.getElementById("comparison-metric-heading");
+  if (heading) heading.textContent = comparisonViewMode === "sales"
+    ? "销量 / 销售额对比"
+    : comparisonViewMode === "reviews"
+      ? "评论 / 差评 / 问题对比"
+      : "综合判断与建议动作";
 
   cards.innerHTML = sortedComparison.map((item, index) => `
     <article class="comparison-card">
       <span class="chip ${index === 2 ? "danger" : "neutral"}">${item.store}</span>
       <h3>${item.site}站</h3>
+      <div class="cell-sub">ASIN：${(item.asins || []).map(escapeHtml).join(" · ") || "待补"}</div>
       <div class="numbers">
         <div><span class="cell-sub">${periodLabel}销量</span><strong>${item.sales}</strong></div>
         <div><span class="cell-sub">${periodLabel}销售额</span><strong>${item.salesAmount}</strong></div>
@@ -1002,7 +1010,7 @@ function buildComparisonPoolChips() {
     const label = mode === "parent" ? `Parent ASIN: ${term}` : mode === "identifiers" ? `编码: ${term}` : `自动识别: ${term}`;
     return `<span class="chip neutral">${escapeHtml(label)}</span>`;
   });
-  chips.push(`<span class="chip warn">当前站点：${escapeHtml(scoped)} · 已匹配 ${comparisonData.length} 个店铺样本</span>`);
+  chips.push(`<span class="chip warn">当前站点：${escapeHtml(scoped)} · 已聚合 ${comparisonData.length} 个店铺</span>`);
   return chips.join("");
 }
 
@@ -1037,8 +1045,8 @@ function comparisonSummaryScope() {
 }
 
 function exportComparisonTable() {
-  const headers = ["店铺", "站点", "近30天销量", "近30天销售额", "评分", "差评占比", "评论总数", "带图评论", "主要问题TOP3", "建议动作"];
-  const rows = comparisonData.map((item) => [item.store, item.site, item.sales, item.salesAmount, item.score, `${item.negative}%`, item.volume, item.imageReviews, item.top3, item.action]);
+  const headers = ["店铺", "站点", "ASIN", "近30天销量", "近30天销售额", "评分", "差评占比", "评论总数", "带图评论", "主要问题TOP3", "建议动作"];
+  const rows = comparisonData.map((item) => [item.store, item.site, (item.asins || []).join(" / "), item.sales, item.salesAmount, item.score, comparisonMetric(item.negative, "%"), item.volume, item.imageReviews, item.top3, item.action]);
   downloadCsv(`comparison-${Date.now()}.csv`, [headers, ...rows]);
 }
 
@@ -1390,6 +1398,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   restoreProductColumns();
   applyInitialPageFilters();
+  restorePageState();
   renderDashboard();
   renderStores();
   renderProducts();
@@ -1423,7 +1432,38 @@ document.addEventListener("DOMContentLoaded", async () => {
   bindComparisonViewSwitch();
   bindComparisonActions();
   bindReportFilterSwitch();
+  bindPageStatePersistence();
 });
+
+function pageStateKey() {
+  return `cb-page-state:${document.body.dataset.page || "unknown"}`;
+}
+
+function restorePageState() {
+  if (window.location.search) return;
+  let state = {};
+  try { state = JSON.parse(sessionStorage.getItem(pageStateKey()) || "{}"); } catch (error) { return; }
+  document.querySelectorAll("input[id], select[id], textarea[id]").forEach((node) => {
+    if (["file", "password"].includes(node.type) || !(node.id in state)) return;
+    if (node.type === "checkbox") node.checked = Boolean(state[node.id]);
+    else node.value = state[node.id];
+  });
+}
+
+function bindPageStatePersistence() {
+  const save = () => {
+    const state = {};
+    document.querySelectorAll("input[id], select[id], textarea[id]").forEach((node) => {
+      if (["file", "password"].includes(node.type)) return;
+      state[node.id] = node.type === "checkbox" ? node.checked : node.value;
+    });
+    sessionStorage.setItem(pageStateKey(), JSON.stringify(state));
+  };
+  document.querySelectorAll("input[id], select[id], textarea[id]").forEach((node) => {
+    node.addEventListener("change", save);
+    node.addEventListener("input", save);
+  });
+}
 
 function applyInitialPageFilters() {
   const params = new URLSearchParams(window.location.search);
@@ -1530,6 +1570,8 @@ function bindCrudActions() {
   bindBootstrapLocalData();
   bindUrlCaptureActions();
   bindGenerateTasks();
+  bindTaskImport();
+  bindTaskExport();
   bindStoreImport();
   bindReportActions();
   bindLogout();
@@ -1833,7 +1875,7 @@ async function hydrateStores(refreshRegistry = true) {
 
 async function fetchJson(path, options = undefined) {
   const headers = new Headers(options?.headers || {});
-  if (!headers.has("Content-Type") && options?.body) {
+  if (!headers.has("Content-Type") && options?.body && !(options.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
   const token = getAuthToken();
@@ -1961,9 +2003,10 @@ async function hydrateComparison() {
     }
     const data = await fetchJson(`/products/compare?${params.toString()}`);
     const siteCodes = selectedComparisonSites();
-    comparisonData = (data.items || [])
+    const matchedItems = (data.items || [])
       .filter((item) => !siteCodes.length || siteCodes.includes(item.site_code))
       .map(mapComparisonFromApi);
+    comparisonData = groupComparisonByStore(matchedItems);
     const note = document.getElementById("comparison-notes");
     if (note) {
       note.textContent = period === "all"
@@ -1976,6 +2019,54 @@ async function hydrateComparison() {
     renderComparison();
     console.warn("Comparison API unavailable", error);
   }
+}
+
+function groupComparisonByStore(items) {
+  const groups = new Map();
+  items.forEach((item) => {
+    const key = `${item.store}|${item.site}`;
+    const group = groups.get(key) || {
+      ...item,
+      asins: [],
+      sales: 0,
+      salesAmountValue: 0,
+      volume: 0,
+      imageReviews: 0,
+      scoreWeight: 0,
+      scoreTotal: 0,
+      negativeWeight: 0,
+      negativeTotal: 0,
+      issueSet: new Set(),
+    };
+    const volume = Number(item.volume) || 0;
+    const sales = Number(item.sales) || 0;
+    group.asins.push(item.asin || item.sku || "待补编码");
+    group.sales += sales;
+    group.salesAmountValue += Number(item.salesAmountValue) || 0;
+    group.volume += volume;
+    group.imageReviews += Number(item.imageReviews) || 0;
+    if (Number.isFinite(Number(item.score))) {
+      group.scoreTotal += Number(item.score) * Math.max(volume, 1);
+      group.scoreWeight += Math.max(volume, 1);
+    }
+    if (Number.isFinite(Number(item.negative))) {
+      group.negativeTotal += Number(item.negative) * Math.max(volume, 1);
+      group.negativeWeight += Math.max(volume, 1);
+    }
+    String(item.top3 || "").split("/").map((value) => value.trim()).filter(Boolean).forEach((value) => group.issueSet.add(value));
+    groups.set(key, group);
+  });
+  return [...groups.values()].map((group) => ({
+    ...group,
+    asins: [...new Set(group.asins)],
+    sales: group.sales || "-",
+    salesAmount: group.salesAmountValue ? `${group.currency || ""}${group.salesAmountValue.toFixed(2)}` : "-",
+    score: group.scoreWeight ? (group.scoreTotal / group.scoreWeight).toFixed(2) : "-",
+    negative: group.negativeWeight ? Number((group.negativeTotal / group.negativeWeight).toFixed(2)) : null,
+    volume: group.volume || "-",
+    imageReviews: group.imageReviews || "待导入",
+    top3: [...group.issueSet].slice(0, 3).join(" / ") || "待导入真实评论",
+  }));
 }
 
 async function hydrateTasks() {
@@ -2320,7 +2411,41 @@ function bindTaskCreate() {
   const button = document.getElementById("tasks-create-button");
   if (!button) return;
   button.addEventListener("click", async () => {
-    openTaskEditor();
+    await openTaskEditor();
+  });
+}
+
+function bindTaskImport() {
+  const button = document.getElementById("tasks-import-button");
+  const fileInput = document.getElementById("tasks-import-file");
+  if (!button || !fileInput) return;
+  button.onclick = () => fileInput.click();
+  fileInput.onchange = async () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    const data = new FormData();
+    data.append("file", file);
+    button.disabled = true;
+    button.textContent = "导入中...";
+    try {
+      const result = await fetchJson("/supplier-tasks/import", { method: "POST", body: data });
+      await hydrateTasks();
+      alert(`整改任务已导入：新增 ${result.created || 0} 条，更新 ${result.updated || 0} 条。`);
+    } catch (error) {
+      alert(`导入失败：${error.message}`);
+    } finally {
+      button.disabled = false;
+      button.textContent = "导入整改表";
+      fileInput.value = "";
+    }
+  };
+}
+
+function bindTaskExport() {
+  document.getElementById("tasks-export-button")?.addEventListener("click", () => {
+    const headers = ["任务编号", "ASIN", "产品标题", "供应商", "问题分类", "证据摘要", "建议方案", "实际整改", "优先级", "状态", "截止日期", "备注"];
+    const rows = tasks.map((item) => [item.id, item.asin, item.product, item.supplier, item.issue, item.evidence, item.suggestedAction, item.actualRectification, item.priority, item.status, item.due, ""]);
+    downloadCsv(`supplier-tasks-${Date.now()}.csv`, [headers, ...rows]);
   });
 }
 
@@ -3054,7 +3179,7 @@ function bindTaskRowActions() {
       const target = tasks.find((item) => item.recordId === id);
       if (!target) return;
       if (action === "edit") {
-        openTaskEditor(target);
+        await openTaskEditor(target);
         return;
       }
       if (confirm(`确认删除整改任务：${target.id}？`)) {
@@ -3576,7 +3701,7 @@ function taskEditorFields() {
   return [
     { type: "section", label: "基础信息", hint: "任务编号可自动生成；产品、ASIN、问题类型建议明确填全，方便后续评论联动。" },
     { key: "task_code", label: "任务编号", required: true },
-    { key: "asin", label: "ASIN", required: true },
+    { key: "asin", label: "ASIN", required: true, datalist: "task-asin-options", options: taskAsinOptionValues(), hint: "输入或选择已有 ASIN 后，会自动带出产品标题和供应商。" },
     { key: "product_title", label: "产品标题", full: true, required: true },
     { key: "supplier_name", label: "供应商", datalist: "task-supplier-options", options: supplierOptionValues(), required: true },
     { key: "issue_category", label: "问题类型", type: "select", options: issueOptions(), required: true },
@@ -3590,7 +3715,8 @@ function taskEditorFields() {
   ];
 }
 
-function openTaskEditor(source = null) {
+async function openTaskEditor(source = null) {
+  await ensureTaskProductCatalog();
   const values = source ? {
     task_code: source.id || "",
     asin: source.asin || "",
@@ -3661,10 +3787,20 @@ function bindTaskEditorInteractions() {
       codeNode.value = buildTaskCode(asinNode?.value || "", issueNode?.value || "");
     }
   };
+  const fillProduct = () => {
+    const asin = String(asinNode?.value || "").trim();
+    const matched = products.find((item) => item.asin === asin);
+    if (!matched) return;
+    const titleNode = document.querySelector('[data-editor-key="product_title"]');
+    const supplierNode = document.querySelector('[data-editor-key="supplier_name"]');
+    if (titleNode && !titleNode.value.trim()) titleNode.value = matched.name || "";
+    if (supplierNode && !supplierNode.value.trim() && matched.supplier && matched.supplier !== "-") supplierNode.value = matched.supplier;
+  };
   codeNode?.addEventListener("input", () => {
     codeNode.dataset.userEdited = codeNode.value.trim() ? "yes" : "";
   });
-  asinNode?.addEventListener("input", sync);
+  asinNode?.addEventListener("input", () => { sync(); fillProduct(); });
+  asinNode?.addEventListener("change", fillProduct);
   issueNode?.addEventListener("change", sync);
   sync();
 }
@@ -3672,8 +3808,22 @@ function bindTaskEditorInteractions() {
 function buildTaskCode(asin, issue) {
   const date = new Date().toISOString().slice(2, 10).replaceAll("-", "");
   const shortAsin = String(asin || "TASK").trim().slice(-6) || "TASK";
-  const shortIssue = String(issue || "ISS").trim().slice(0, 2).toUpperCase() || "IS";
-  return `SR-${date}-${shortAsin}-${shortIssue}`;
+  return `SR-${date}-${shortAsin}`;
+}
+
+function taskAsinOptionValues() {
+  return [...new Set(products.map((item) => item.asin).filter(Boolean))].map((value) => ({ value }));
+}
+
+async function ensureTaskProductCatalog() {
+  if (taskProductCatalogLoaded) return;
+  try {
+    const data = await fetchJson("/products?limit=300");
+    products = (data.items || []).map(mapProductFromApi);
+    taskProductCatalogLoaded = true;
+  } catch (error) {
+    console.warn("Task product catalog unavailable", error);
+  }
 }
 
 function getRecentGeneratedTaskCodes() {
@@ -4098,7 +4248,11 @@ function mapComparisonFromApi(item) {
   return {
     store: item.store_name || "未识别店铺",
     site: localizeSite(item.site_code),
+    asin: item.asin || "",
+    sku: item.sku || "",
     sales: item.recent_sales ?? "-",
+    salesAmountValue: item.recent_revenue ?? null,
+    currency: item.price_currency || "",
     salesAmount: item.recent_revenue ? `${item.price_currency || ""}${item.recent_revenue}` : "-",
     score: item.rating ?? "-",
     negative: item.negative_ratio,

@@ -3,7 +3,7 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -298,6 +298,14 @@ def url_product_import(
         .filter(or_(*filters) if filters else Product.id == -1)
         .one_or_none()
     )
+
+    # A blocked public page only yields an identifier from the URL.  Persisting it as
+    # a product would make the table look complete while most values are unknown.
+    if not existing and item.get("capture_status") == "error":
+        raise HTTPException(
+            status_code=422,
+            detail="公开商品页未成功读取，无法验证标题、主图、价格和评论数；请改用产品导出表或稍后重试。",
+        )
 
     if existing:
         for key, value in item.items():

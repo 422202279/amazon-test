@@ -4,6 +4,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse, PlainTextResponse
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -97,6 +98,14 @@ def _build_report_content(report_type: str, title: str, scope: str | None, db: S
     latest_products = db.query(Product).order_by(Product.updated_at.desc(), Product.id.desc()).limit(5).all()
     latest_reviews = db.query(Review).order_by(Review.reviewed_at.desc(), Review.id.desc()).limit(5).all()
     latest_tasks = db.query(SupplierTask).order_by(SupplierTask.updated_at.desc(), SupplierTask.id.desc()).limit(5).all()
+    issue_rows = (
+        db.query(Review.issue_category, func.count(Review.id))
+        .filter(Review.is_negative_review.is_(True))
+        .group_by(Review.issue_category)
+        .order_by(func.count(Review.id).desc())
+        .limit(5)
+        .all()
+    )
 
     snapshot = {
         "report_type": report_type,
@@ -124,23 +133,42 @@ def _build_report_content(report_type: str, title: str, scope: str | None, db: S
         f"- 整改任务数：{task_total}",
         f"- 未关闭整改任务：{task_open}",
         "",
-        "## 最新产品样本",
+        "## 产品指标表",
         "",
     ]
     if latest_products:
-        lines.extend([f"- {item.title} | {item.platform}-{item.site_code} | {item.asin or '-'} | 评分 {item.rating or '-'}" for item in latest_products])
+        lines.extend(["| 产品 | 站点 | ASIN | 评分 | Review总数 | 近30天销量 |", "|---|---|---|---:|---:|---:|"])
+        lines.extend([
+            f"| {item.title} | {item.platform}-{item.site_code} | {item.asin or '-'} | {item.rating or '-'} | {item.review_count or '-'} | {item.monthly_sales or '-'} |"
+            for item in latest_products
+        ])
     else:
         lines.append("- 暂无产品数据")
 
-    lines.extend(["", "## 最新评论样本", ""])
+    lines.extend(["", "## 评论证据表", ""])
     if latest_reviews:
-        lines.extend([f"- {item.product_title or '未命名产品'} | {item.star_rating or '-'}星 | {item.issue_category or '待分类'} | {item.review_title or '无标题'}" for item in latest_reviews])
+        lines.extend(["| 产品 | 星级 | 评论时间 | 问题分类 | 评论标题 |", "|---|---:|---|---|---|"])
+        lines.extend([
+            f"| {item.product_title or '未命名产品'} | {item.star_rating or '-'} | {item.reviewed_at or '-'} | {item.issue_category or '待分类'} | {item.review_title or '无标题'} |"
+            for item in latest_reviews
+        ])
     else:
         lines.append("- 暂无评论数据")
 
+    lines.extend(["", "## 差评问题 TOP5", ""])
+    if issue_rows:
+        lines.extend(["| 问题分类 | 差评条数 |", "|---|---:|"])
+        lines.extend([f"| {issue or '待分类'} | {count} |" for issue, count in issue_rows])
+    else:
+        lines.append("- 暂无真实差评明细，不能生成问题占比。")
+
     lines.extend(["", "## 整改任务跟进", ""])
     if latest_tasks:
-        lines.extend([f"- {item.task_code or '-'} | {item.product_title or '未命名产品'} | {item.status} | {item.priority}" for item in latest_tasks])
+        lines.extend(["| 任务编号 | ASIN | 问题 | 状态 | 优先级 | 截止时间 |", "|---|---|---|---|---|---|"])
+        lines.extend([
+            f"| {item.task_code or '-'} | {item.asin or '-'} | {item.issue_category or '-'} | {item.status} | {item.priority} | {item.due_date or '-'} |"
+            for item in latest_tasks
+        ])
     else:
         lines.append("- 暂无整改任务")
 

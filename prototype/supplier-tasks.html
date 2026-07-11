@@ -38,7 +38,9 @@
           </div>
           <div class="topbar-actions">
             <a class="button ghost" href="./templates/supplier-task-template.xlsx" download>下载供应商模板</a>
-            <button class="button ghost">导出整改表</button>
+            <button class="button ghost" id="tasks-import-button">导入整改表</button>
+            <input id="tasks-import-file" type="file" accept=".xlsx,.xls" hidden />
+            <button class="button ghost" id="tasks-export-button">导出整改表</button>
             <button class="button ghost" id="tasks-generate-button">从差评生成任务</button>
             <button class="button primary" id="tasks-create-button">新建整改任务</button>
           </div>
