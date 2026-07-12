@@ -1,4 +1,5 @@
-from datetime import datetime
+import re
+from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
@@ -9,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.review import Review
+from app.models.review_capture_job import ReviewCaptureJob
 from app.models.supplier_task import SupplierTask
 from app.models.user_account import UserAccount
 from app.serializers import to_dict
@@ -20,6 +22,11 @@ from app.services.review_importer import import_reviews_from_workbook, preview_r
 from app.services.translation_helper import suggest_cn_summary
 
 router = APIRouter(prefix="/reviews", tags=["reviews"])
+
+AMAZON_SITE_BY_HOST = {
+    "amazon.com": "US", "amazon.ca": "CA", "amazon.co.uk": "UK", "amazon.de": "DE",
+    "amazon.fr": "FR", "amazon.co.jp": "JP",
+}
 
 
 class ReviewPayload(BaseModel):
@@ -49,6 +56,67 @@ class ReviewPayload(BaseModel):
     rectification_status: str | None = None
     source_type: str | None = None
     reviewed_at: str | None = None
+
+
+class ReviewCaptureQueuePayload(BaseModel):
+    entries: str
+    site_code: str | None = None
+    store_name: str | None = None
+
+
+@router.get("/capture-jobs")
+def list_review_capture_jobs(
+    status: str | None = None,
+    db: Session = Depends(get_db),
+):
+    query = db.query(ReviewCaptureJob)
+    if status:
+        query = query.filter(ReviewCaptureJob.status == status)
+    jobs = query.order_by(ReviewCaptureJob.updated_at.desc(), ReviewCaptureJob.id.desc()).all()
+    return {"items": [to_dict(job) for job in jobs], "total": len(jobs)}
+
+
+@router.post("/capture-jobs")
+def queue_review_captures(
+    payload: ReviewCaptureQueuePayload | None = None,
+    entries: str | None = None,
+    site_code: str | None = None,
+    store_name: str | None = None,
+    db: Session = Depends(get_db),
+    _: UserAccount = Depends(get_current_user),
+):
+    content = payload.entries if payload else entries or ""
+    default_site = payload.site_code if payload else site_code
+    default_store = payload.store_name if payload else store_name
+    created = 0
+    duplicate = 0
+    invalid: list[str] = []
+    for raw_entry in re.split(r"[\s,，;；]+", content.strip()):
+        if not raw_entry:
+            continue
+        asin_match = re.search(r"\b([A-Z0-9]{10})\b", raw_entry.upper())
+        if not asin_match:
+            invalid.append(raw_entry)
+            continue
+        asin = asin_match.group(1)
+        inferred_site = _infer_amazon_site(raw_entry) or default_site
+        existing = db.query(ReviewCaptureJob).filter(
+            ReviewCaptureJob.asin == asin,
+            ReviewCaptureJob.site_code == inferred_site,
+            ReviewCaptureJob.status == "待本机采集",
+        ).one_or_none()
+        if existing:
+            duplicate += 1
+            continue
+        db.add(ReviewCaptureJob(
+            asin=asin,
+            product_url=raw_entry if raw_entry.startswith("http") else None,
+            site_code=inferred_site,
+            store_name=default_store,
+        ))
+        created += 1
+    db.commit()
+    return {"created": created, "duplicate": duplicate, "invalid": invalid}
 
 
 @router.get("")
@@ -234,6 +302,7 @@ def import_reviews(
         warning_rows=quality["warning_rows"],
         issue_summary=quality,
     )
+    _complete_capture_jobs(db, preview_rows, Path(path).name)
     db.commit()
     return {"source": "generic_review_import", "quality": quality, **result}
 
@@ -268,6 +337,7 @@ async def upload_reviews(
         warning_rows=quality["warning_rows"],
         issue_summary=quality,
     )
+    _complete_capture_jobs(db, preview_rows, source_name)
     db.commit()
     return {"source": "uploaded_review_export", "quality": quality, **result}
 
@@ -288,3 +358,30 @@ def _parse_datetime(value: str | None) -> datetime | None:
     if not value:
         return None
     return datetime.fromisoformat(value.replace(" ", "T"))
+
+
+def _infer_amazon_site(entry: str) -> str | None:
+    host_match = re.search(r"amazon\.(com\.br|com\.mx|co\.uk|co\.jp|com|ca|de|fr)", entry.lower())
+    if not host_match:
+        return None
+    return AMAZON_SITE_BY_HOST.get(f"amazon.{host_match.group(1)}")
+
+
+def _complete_capture_jobs(db: Session, review_rows: list[dict], source_name: str) -> None:
+    counts: dict[tuple[str | None, str | None], int] = {}
+    for row in review_rows:
+        asin = row.get("asin")
+        if asin:
+            key = (asin, row.get("site_code"))
+            counts[key] = counts.get(key, 0) + 1
+    for (asin, site_code), count in counts.items():
+        jobs = db.query(ReviewCaptureJob).filter(
+            ReviewCaptureJob.asin == asin,
+            ReviewCaptureJob.site_code == site_code,
+            ReviewCaptureJob.status == "待本机采集",
+        ).all()
+        for job in jobs:
+            job.status = "已入库"
+            job.source_file = source_name
+            job.imported_review_count = count
+            job.completed_at = datetime.now(UTC)

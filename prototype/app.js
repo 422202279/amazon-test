@@ -107,6 +107,7 @@ const demoReviews = [
   { tone: "tone-6", id: "RV-10026", title: "尺寸偏小", product: "记忆棉人体工学坐垫", store: "Coupang Seoul", site: "韩国", platform: "Coupang", stars: 2, hasImage: true, mediaType: "video", reviewUrl: "https://www.amazon.com/product-reviews/B0DXSEAT01", productUrl: "https://www.amazon.com/dp/B0DXSEAT01", content: "看图以为会更宽，放在办公室椅子上略小，长时间坐不太稳。", issue: "尺寸问题", mood: "负面", feedback: "已反馈", rectify: "处理中", source: "人工修正", asin: "B0DXSEAT01" }
 ];
 let reviews = APP_ENV === "demo" ? demoReviews.slice() : [];
+let reviewCaptureJobs = [];
 
 const demoComparisonData = [
   { store: "US Home Store", site: "美国", sales: 642, salesAmount: "$19,253", score: 4.1, negative: 8.6, volume: 1284, imageReviews: 93, top3: "坐感塌陷 / 尺寸偏小 / 回弹慢", action: "调整内芯密度与文案说明" },
@@ -1686,6 +1687,35 @@ function bindReviewFilters() {
 }
 
 function bindReviewUtilityActions() {
+  const capturePanel = document.getElementById("reviews-capture-queue-panel");
+  document.getElementById("reviews-capture-queue-button")?.addEventListener("click", () => {
+    capturePanel?.classList.remove("hidden-block");
+  });
+  document.getElementById("reviews-capture-queue-close")?.addEventListener("click", () => {
+    capturePanel?.classList.add("hidden-block");
+  });
+  document.getElementById("reviews-capture-submit")?.addEventListener("click", async () => {
+    const entries = document.getElementById("reviews-capture-entries")?.value?.trim() || "";
+    const status = document.getElementById("reviews-capture-status");
+    if (!entries) {
+      if (status) status.textContent = "请先粘贴至少一个产品链接或 ASIN。";
+      return;
+    }
+    try {
+      const result = await fetchJson("/reviews/capture-jobs", {
+        method: "POST",
+        body: JSON.stringify({
+          entries,
+          site_code: document.getElementById("reviews-capture-site")?.value || null,
+          store_name: document.getElementById("reviews-capture-store")?.value?.trim() || null,
+        }),
+      });
+      if (status) status.textContent = `已加入 ${result.created || 0} 条，重复 ${result.duplicate || 0} 条${result.invalid?.length ? `，未识别 ${result.invalid.length} 条` : ""}。`;
+      await hydrateReviewCaptureJobs();
+    } catch (error) {
+      if (status) status.textContent = `加入失败：${error.message}`;
+    }
+  });
   document.getElementById("reviews-export-button")?.addEventListener("click", () => {
     const flatReviews = reviews.filter((item) => !("recent_reviews" in item));
     const rows = flatReviews.map((item) => [
@@ -1838,7 +1868,10 @@ async function hydrateLiveData() {
   }
   if (page === "stores") await hydrateStores(false);
   if (page === "products") await hydrateProducts();
-  if (page === "reviews") await hydrateReviews();
+  if (page === "reviews") {
+    await hydrateReviews();
+    await hydrateReviewCaptureJobs();
+  }
   if (page === "comparison") await hydrateComparison();
   if (page === "product-detail") await hydrateProducts();
   if (page === "supplier-tasks") await hydrateTasks();
@@ -1986,6 +2019,20 @@ async function hydrateReviews() {
     reviews = [];
     renderReviews();
     console.warn("Reviews API unavailable", error);
+  }
+}
+
+async function hydrateReviewCaptureJobs() {
+  const body = document.getElementById("reviews-capture-jobs");
+  if (!body) return;
+  try {
+    const data = await fetchJson("/reviews/capture-jobs");
+    reviewCaptureJobs = data.items || [];
+    body.innerHTML = reviewCaptureJobs.map((job) => `
+      <tr><td>${escapeHtml(job.asin || "-")}</td><td>${escapeHtml(localizeSite(job.site_code) || "待指定")}</td><td><span class="status ${job.status === "已入库" ? "success" : "warn"}">${escapeHtml(job.status || "待本机采集")}</span></td><td>${job.imported_review_count ?? "-"}</td><td>${escapeHtml(job.source_file || "-")}</td><td>${escapeHtml(job.updated_at || "-")}</td></tr>
+    `).join("") || '<tr><td colspan="6" class="empty-state">暂无待采集任务。加入产品链接后会显示在这里。</td></tr>';
+  } catch (error) {
+    body.innerHTML = '<tr><td colspan="6" class="empty-state">采集队列暂不可用。</td></tr>';
   }
 }
 

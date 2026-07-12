@@ -37,6 +37,7 @@
             <p>展示 1~5 星全部评论，支持图片、内容、站点、问题分类与供应商反馈状态筛选</p>
           </div>
           <div class="topbar-actions">
+            <button class="button ghost" id="reviews-capture-queue-button">本机采集队列</button>
             <button class="button ghost" id="reviews-import-button">导入评论文件</button>
             <input id="reviews-import-file" type="file" accept=".xlsx,.xls" hidden />
             <button class="button ghost" id="reviews-batch-issue-button">批量标记问题分类</button>
@@ -83,6 +84,27 @@
             <input id="reviews-search-input" type="text" placeholder="评论内容 / 评论人 / ASIN / SKU / 标题；支持多 ASIN / SKU，逗号、中文逗号、换行或空格分隔" />
           </div>
           <button class="button" id="reviews-apply-button">查询</button>
+        </section>
+
+        <section class="panel hidden-block" id="reviews-capture-queue-panel">
+          <div class="panel-head">
+            <div>
+              <h2>本机评论采集队列</h2>
+              <p>批量粘贴 Amazon 产品链接或 ASIN。系统仅排队和核验导入结果；需在本机已登录的 Chrome + 卖家精灵环境完成评论下载。</p>
+            </div>
+            <button class="button ghost" id="reviews-capture-queue-close">收起</button>
+          </div>
+          <div class="form-grid">
+            <label class="form-field wide">产品链接 / ASIN（每行一个，或用逗号分隔）
+              <textarea id="reviews-capture-entries" rows="4" placeholder="https://www.amazon.ca/dp/B0CHJ55J9G&#10;B0XXXXXXXX"></textarea>
+            </label>
+            <label class="form-field">站点兜底（纯 ASIN 时必选）
+              <select id="reviews-capture-site"><option value="">由链接自动识别</option><option value="US">美国</option><option value="CA">加拿大</option><option value="UK">英国</option><option value="DE">德国</option><option value="FR">法国</option><option value="JP">日本</option></select>
+            </label>
+            <label class="form-field">店铺（可选）<input id="reviews-capture-store" placeholder="用于后续店铺归属" /></label>
+          </div>
+          <div class="topbar-actions"><button class="button" id="reviews-capture-submit">加入待采集队列</button><span class="cell-sub" id="reviews-capture-status"></span></div>
+          <div class="table-wrap compact-table"><table><thead><tr><th>ASIN</th><th>站点</th><th>状态</th><th>已入库评论</th><th>来源文件</th><th>更新时间</th></tr></thead><tbody id="reviews-capture-jobs"></tbody></table></div>
         </section>
 
         <section class="table-summary">

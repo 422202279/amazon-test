@@ -11,7 +11,8 @@ from sqlalchemy.orm import sessionmaker
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.database import Base
-from app.routers.reviews import _serialize_review, list_reviews
+from app.routers.reviews import _serialize_review, list_review_capture_jobs, list_reviews, queue_review_captures
+from app.models.user_account import UserAccount
 from app.services.data_quality import build_data_quality_summary, validate_review_rows
 from app.models.review import Review
 from app.models.supplier_task import SupplierTask
@@ -122,6 +123,24 @@ class ReviewWorkflowTests(unittest.TestCase):
         self.assertEqual(group["media_review_count"], 1)
         self.assertEqual(group["star_counts"], {"1": 1, "2": 0, "3": 0, "4": 0, "5": 1})
         self.assertEqual(group["source_types"], ["sellersprite_review_export"])
+
+    def test_review_capture_queue_extracts_asin_and_site_from_amazon_urls(self):
+        with self.session_factory() as db:
+            admin = UserAccount(name="Admin", email="admin@example.com", password_hash="x", role="管理员")
+            db.add(admin)
+            db.commit()
+            result = queue_review_captures(
+                entries="https://www.amazon.ca/dp/B0CHJ55J9G?th=1\nhttps://www.amazon.co.uk/dp/B0ABC12345",
+                db=db,
+                _=admin,
+            )
+            queued = list_review_capture_jobs(db=db)
+
+        self.assertEqual(result["created"], 2)
+        self.assertEqual(result["invalid"], [])
+        self.assertEqual([item["asin"] for item in queued["items"]], ["B0ABC12345", "B0CHJ55J9G"])
+        self.assertEqual({item["site_code"] for item in queued["items"]}, {"CA", "UK"})
+        self.assertTrue(all(item["status"] == "待本机采集" for item in queued["items"]))
 
     def test_import_reviews_and_generate_supplier_tasks(self):
         with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
