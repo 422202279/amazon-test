@@ -2471,18 +2471,28 @@ function bindReviewImport() {
   if (!button || !fileInput) return;
   button.onclick = () => fileInput.click();
   fileInput.onchange = async () => {
-    const file = fileInput.files?.[0];
-    if (!file) return;
-    const form = new FormData();
-    form.append("file", file);
+    const files = Array.from(fileInput.files || []);
+    if (!files.length) return;
     button.disabled = true;
-    button.textContent = "导入中...";
+    let created = 0;
+    let updated = 0;
+    const failed = [];
     try {
-      const result = await fetchJson("/reviews/upload", { method: "POST", body: form });
+      for (const [index, file] of files.entries()) {
+        button.textContent = `导入 ${index + 1}/${files.length}...`;
+        const form = new FormData();
+        form.append("file", file);
+        try {
+          const result = await fetchJson("/reviews/upload", { method: "POST", body: form });
+          created += result.created || 0;
+          updated += result.updated || 0;
+        } catch (error) {
+          failed.push(`${file.name}：${error.message}`);
+        }
+      }
       await hydrateReviews();
-      alert(`真实评论已导入：新增 ${result.created || 0} 条，更新 ${result.updated || 0} 条。`);
-    } catch (error) {
-      alert(`评论导入失败：${error.message}`);
+      await hydrateReviewCaptureJobs();
+      alert(`评论文件处理完成：新增 ${created} 条，更新 ${updated} 条${failed.length ? `；失败 ${failed.length} 个文件：${failed.join("；")}` : ""}。`);
     } finally {
       button.disabled = false;
       button.textContent = "导入评论文件";
