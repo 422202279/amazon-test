@@ -1,6 +1,7 @@
 import sys
 import tempfile
 import unittest
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -10,7 +11,7 @@ from sqlalchemy.orm import sessionmaker
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.database import Base
-from app.routers.reviews import _serialize_review
+from app.routers.reviews import _serialize_review, list_reviews
 from app.services.data_quality import build_data_quality_summary, validate_review_rows
 from app.models.review import Review
 from app.models.supplier_task import SupplierTask
@@ -93,6 +94,34 @@ class ReviewWorkflowTests(unittest.TestCase):
         self.assertTrue(item.has_images)
         self.assertEqual(item.review_images, "https://media.example.com/review.mp4")
         self.assertEqual(item.issue_category, "质量问题")
+
+    def test_product_review_overview_exposes_real_aggregate_metrics(self):
+        with self.session_factory() as db:
+            db.add_all([
+                Review(
+                    platform="Amazon", site_code="CA", store_name="加拿大店", asin="B0GROUP001",
+                    product_title="Launcher", star_rating=1, review_content="Stopped working", has_images=True,
+                    is_negative_review=True, issue_category="质量问题", source_type="sellersprite_review_export",
+                    reviewed_at=datetime(2026, 7, 10),
+                ),
+                Review(
+                    platform="Amazon", site_code="CA", store_name="加拿大店", asin="B0GROUP001",
+                    product_title="Launcher", star_rating=5, review_content="Great", has_images=False,
+                    is_negative_review=False, issue_category="待分类", source_type="sellersprite_review_export",
+                    reviewed_at=datetime(2026, 7, 9),
+                ),
+            ])
+            db.commit()
+
+            result = list_reviews(view_mode="product", db=db)
+
+        self.assertEqual(result["group_count"], 1)
+        group = result["items"][0]
+        self.assertEqual(group["review_count"], 2)
+        self.assertEqual(group["negative_review_count"], 1)
+        self.assertEqual(group["media_review_count"], 1)
+        self.assertEqual(group["star_counts"], {"1": 1, "2": 0, "3": 0, "4": 0, "5": 1})
+        self.assertEqual(group["source_types"], ["sellersprite_review_export"])
 
     def test_import_reviews_and_generate_supplier_tasks(self):
         with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:

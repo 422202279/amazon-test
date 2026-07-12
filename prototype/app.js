@@ -148,7 +148,8 @@ let roles = [
   { role: "只读访客", modules: ["Dashboard", "报告"], permissions: ["查看"] },
 ];
 
-let reviewViewMode = "timeline";
+// Open the compact ASIN overview first; raw comments remain a drill-down view.
+let reviewViewMode = "product";
 
 function statusClass(status) {
   if (["正常监控", "已整改", "最新", "可导出", "已关闭"].includes(status)) return "success";
@@ -758,25 +759,25 @@ function renderReviews() {
             <div>
               <span class="cell-title">${group.asin || "未识别ASIN"}</span>
               <span class="cell-sub">${group.product_title || "未命名产品"}</span>
-              <span class="cell-sub">最近评论：${group.latest_reviewed_at || "未记录"}</span>
+              <span class="cell-sub">最近评论：${group.latest_reviewed_at || "未记录"} · 数据更新：${group.latest_updated_at || "未记录"}</span>
             </div>
           </div>
         </td>
         <td>
           <span class="cell-title">${(group.stores || []).join(" / ") || "未识别店铺"}</span>
           <span class="cell-sub">${(group.sites || []).join(" / ") || "未识别站点"}</span>
-          <span class="cell-sub">评论数 ${group.review_count} · 差评 ${group.negative_review_count}</span>
+          <span class="cell-sub">评论 ${group.review_count} · 1~3 星 ${group.negative_review_count} · 带图/视频 ${group.media_review_count || 0}</span>
         </td>
         <td>${(group.sites || []).join(" / ")}<span class="cell-sub">聚合视图</span></td>
-        <td><span class="stars">${starString(Math.min(5, Math.max(1, group.recent_reviews?.[0]?.star_rating || 3)))}</span></td>
+        <td><span class="stars">1星 ${group.star_counts?.["1"] || 0} · 2星 ${group.star_counts?.["2"] || 0} · 3星 ${group.star_counts?.["3"] || 0}</span></td>
         <td>${group.recent_reviews?.[0] ? renderReviewMedia(mapReviewFromApi(group.recent_reviews[0])) : '<span class="cell-sub">无图 / 无视频</span>'}</td>
         <td>${(group.recent_reviews || []).slice(0, 3).map((item) => `<span class="cell-sub">${item.review_title || "无标题"}：${item.review_content || ""}</span>`).join("")}</td>
         <td>${group.recent_reviews?.[0]?.product_url ? `<a class="link-inline" href="${group.recent_reviews[0].product_url}" target="_blank" rel="noreferrer">产品链接</a>` : ""}</td>
-        <td><span class="chip neutral">聚合</span></td>
+        <td><span class="chip neutral">${(group.source_types || []).join(" / ") || "未记录来源"}</span></td>
         <td><span class="chip neutral">${(group.recent_reviews || []).map((item) => item.issue_category).filter(Boolean).slice(0, 2).join(" / ") || "待分类"}</span></td>
         <td><span class="status neutral">产品聚合</span></td>
         <td><span class="status ${(group.supplier_task_statuses || []).length ? "warn" : "neutral"}">${(group.supplier_task_statuses || []).join(" / ") || "未生成任务"}</span></td>
-        <td><span class="status neutral">查看子评论</span></td>
+        <td><a class="link-inline" href="./reviews.html?view=timeline&q=${encodeURIComponent(group.asin || "")}">查看 ${group.review_count} 条明细</a></td>
         <td><span class="cell-sub">聚合视图不支持直接编辑</span></td>
       </tr>
     `).join("") || '<tr><td colspan="13" class="empty-state">当前筛选条件下暂无评论数据。</td></tr>';
@@ -1482,6 +1483,7 @@ function applyInitialPageFilters() {
     const period = params.get("period");
     const media = params.get("media");
     const view = params.get("view");
+    const q = params.get("q");
     if (period && document.getElementById("reviews-period-filter")) {
       document.getElementById("reviews-period-filter").value = period;
     }
@@ -1490,6 +1492,12 @@ function applyInitialPageFilters() {
     }
     if (view) {
       reviewViewMode = view;
+      document.querySelectorAll("[data-review-view]").forEach((button) => {
+        button.classList.toggle("active", button.getAttribute("data-review-view") === view);
+      });
+    }
+    if (q && document.getElementById("reviews-search-input")) {
+      document.getElementById("reviews-search-input").value = q;
     }
   }
   if (page === "comparison") {

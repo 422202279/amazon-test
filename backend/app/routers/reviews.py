@@ -109,20 +109,30 @@ def list_reviews(
                     "product_title": review.product_title,
                     "review_count": 0,
                     "negative_review_count": 0,
+                    "media_review_count": 0,
+                    "star_counts": {str(star): 0 for star in range(1, 6)},
                     "latest_reviewed_at": None,
+                    "latest_updated_at": None,
                     "stores": set(),
                     "sites": set(),
+                    "source_types": set(),
                     "supplier_task_statuses": set(),
                     "recent_reviews": [],
                 },
             )
             bucket["review_count"] += 1
             bucket["negative_review_count"] += 1 if review.is_negative_review else 0
+            bucket["media_review_count"] += 1 if review.has_images else 0
+            if review.star_rating in range(1, 6):
+                bucket["star_counts"][str(review.star_rating)] += 1
             bucket["latest_reviewed_at"] = bucket["latest_reviewed_at"] or to_dict(review).get("reviewed_at")
+            bucket["latest_updated_at"] = bucket["latest_updated_at"] or to_dict(review).get("updated_at")
             if review.store_name:
                 bucket["stores"].add(review.store_name)
             if review.site_code:
                 bucket["sites"].add(review.site_code)
+            if review.source_type:
+                bucket["source_types"].add(review.source_type)
             if task and task.status:
                 bucket["supplier_task_statuses"].add(task.status)
             if len(bucket["recent_reviews"]) < 3:
@@ -134,6 +144,7 @@ def list_reviews(
                     **bucket,
                     "stores": sorted(bucket["stores"]),
                     "sites": sorted(bucket["sites"]),
+                    "source_types": sorted(bucket["source_types"]),
                     "supplier_task_statuses": sorted(bucket["supplier_task_statuses"]),
                 }
             )
