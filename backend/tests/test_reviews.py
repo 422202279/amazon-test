@@ -21,6 +21,7 @@ from app.services.review_importer import (
     normalize_review_row,
     preview_reviews_from_workbook,
 )
+from app.services.review_batch_import import find_sellersprite_review_exports
 from app.services.supplier_tasks import generate_tasks_from_negative_reviews
 
 
@@ -73,6 +74,19 @@ class ReviewWorkflowTests(unittest.TestCase):
         self.assertEqual(rows[0]["issue_category"], "尺寸问题")
         self.assertTrue(rows[0]["has_images"])
         self.assertTrue(rows[0]["is_negative_review"])
+
+    def test_review_batch_scanner_only_returns_sellersprite_review_exports(self):
+        with tempfile.TemporaryDirectory() as directory:
+            review = Path(directory) / "B0CHJ55J9G-CA-Reviews-20260711.xlsx"
+            product = Path(directory) / "Product-CA-20260703.xlsx"
+            ignored = Path(directory) / "notes.txt"
+            review.touch()
+            product.touch()
+            ignored.touch()
+
+            files = find_sellersprite_review_exports(directory)
+
+        self.assertEqual(files, [review])
 
     def test_sellersprite_review_columns_keep_media_country_and_review_id(self):
         row = pd.Series({

@@ -1,5 +1,5 @@
 import re
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
@@ -19,6 +19,7 @@ from app.services.data_quality import validate_review_rows
 from app.services.import_jobs import create_import_job
 from app.services.query_helpers import split_identifier_terms
 from app.services.review_importer import import_reviews_from_workbook, preview_reviews_from_workbook
+from app.services.review_batch_import import mark_capture_jobs_imported
 from app.services.translation_helper import suggest_cn_summary
 
 router = APIRouter(prefix="/reviews", tags=["reviews"])
@@ -302,7 +303,7 @@ def import_reviews(
         warning_rows=quality["warning_rows"],
         issue_summary=quality,
     )
-    _complete_capture_jobs(db, preview_rows, Path(path).name)
+    mark_capture_jobs_imported(db, preview_rows, Path(path).name)
     db.commit()
     return {"source": "generic_review_import", "quality": quality, **result}
 
@@ -337,7 +338,7 @@ async def upload_reviews(
         warning_rows=quality["warning_rows"],
         issue_summary=quality,
     )
-    _complete_capture_jobs(db, preview_rows, source_name)
+    mark_capture_jobs_imported(db, preview_rows, source_name)
     db.commit()
     return {"source": "uploaded_review_export", "quality": quality, **result}
 
@@ -365,23 +366,3 @@ def _infer_amazon_site(entry: str) -> str | None:
     if not host_match:
         return None
     return AMAZON_SITE_BY_HOST.get(f"amazon.{host_match.group(1)}")
-
-
-def _complete_capture_jobs(db: Session, review_rows: list[dict], source_name: str) -> None:
-    counts: dict[tuple[str | None, str | None], int] = {}
-    for row in review_rows:
-        asin = row.get("asin")
-        if asin:
-            key = (asin, row.get("site_code"))
-            counts[key] = counts.get(key, 0) + 1
-    for (asin, site_code), count in counts.items():
-        jobs = db.query(ReviewCaptureJob).filter(
-            ReviewCaptureJob.asin == asin,
-            ReviewCaptureJob.site_code == site_code,
-            ReviewCaptureJob.status == "待本机采集",
-        ).all()
-        for job in jobs:
-            job.status = "已入库"
-            job.source_file = source_name
-            job.imported_review_count = count
-            job.completed_at = datetime.now(UTC)
