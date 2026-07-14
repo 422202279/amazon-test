@@ -110,6 +110,19 @@ class ReviewWorkflowTests(unittest.TestCase):
         self.assertEqual(item.review_images, "https://media.example.com/review.mp4")
         self.assertEqual(item.issue_category, "质量问题")
 
+    def test_sellersprite_srp_links_extract_the_real_review_id(self):
+        row = pd.Series({
+            "ASIN": None,
+            "标题": "Broken",
+            "内容": "Stopped working.",
+            "星级": 1,
+            "评论链接": "https://www.amazon.com/portal/customer-reviews/srp/-/R2I46APSWNTA1Q/ref=cm_cr_getr_d_rvw_ttl",
+        })
+
+        item = normalize_review_row(row, "B0CH2TXGTP-US-Reviews-20260713.xlsx")
+
+        self.assertEqual(item.review_external_id, "R2I46APSWNTA1Q")
+
     def test_product_review_overview_exposes_real_aggregate_metrics(self):
         with self.session_factory() as db:
             db.add_all([
@@ -212,6 +225,24 @@ class ReviewWorkflowTests(unittest.TestCase):
         self.assertEqual(review_count, 2)
         self.assertEqual(task_result["created"], 1)
         self.assertEqual(task_count, 1)
+
+    def test_second_review_import_in_one_transaction_updates_existing_reviews(self):
+        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
+            workbook_path = tmp.name
+        pd.DataFrame([{
+            "平台": "Amazon", "站点": "US", "ASIN": "B0TEST001", "评论ID": "R-001",
+            "星级": 1, "评论内容": "Broken", "评论时间": "2026-07-01",
+        }]).to_excel(workbook_path, index=False)
+
+        with self.session_factory() as db:
+            first = import_reviews_from_workbook(db, workbook_path, limit=10)
+            second = import_reviews_from_workbook(db, workbook_path, limit=10)
+            db.commit()
+            count = db.query(Review).count()
+
+        self.assertEqual(first, {"created": 1, "updated": 0})
+        self.assertEqual(second, {"created": 0, "updated": 1})
+        self.assertEqual(count, 1)
 
     def test_review_quality_summary_flags_missing_review_fields(self):
         rows = [

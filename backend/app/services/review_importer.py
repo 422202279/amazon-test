@@ -62,20 +62,25 @@ def import_reviews_from_workbook(db: Session, path: str | Path, sheet_name: str 
         source_product = db.execute(select(Product).where(Product.asin == source_asin)).scalar_one_or_none()
     created = 0
     updated = 0
+    pending_reviews: dict[tuple[str, str, str | None, str | None], Review] = {}
     for row in rows:
+        row["asin"] = row.get("asin") or source_asin
         if source_product:
             row["product_title"] = row.get("product_title") or source_product.title
             row["store_name"] = row.get("store_name") or source_product.store_name
             row["product_url"] = row.get("product_url") or source_product.product_url
             row["site_code"] = row.get("site_code") or source_product.site_code
-        existing = db.execute(
-            select(Review).where(
-                Review.platform == row["platform"],
-                Review.site_code == row["site_code"],
-                Review.review_external_id == row["review_external_id"],
-                Review.asin == row["asin"],
-            )
-        ).scalar_one_or_none()
+        review_key = (row["platform"], row["site_code"], row["asin"], row["review_external_id"])
+        existing = pending_reviews.get(review_key)
+        if existing is None:
+            existing = db.execute(
+                select(Review).where(
+                    Review.platform == row["platform"],
+                    Review.site_code == row["site_code"],
+                    Review.review_external_id == row["review_external_id"],
+                    Review.asin == row["asin"],
+                )
+            ).scalar_one_or_none()
         if existing:
             _apply_review_row(existing, row)
             updated += 1
@@ -83,7 +88,10 @@ def import_reviews_from_workbook(db: Session, path: str | Path, sheet_name: str 
         review = Review(platform=row["platform"], site_code=row["site_code"])
         _apply_review_row(review, row)
         db.add(review)
+        pending_reviews[review_key] = review
         created += 1
+    # Make this file's rows visible to the next file in a batch before the final transaction commit.
+    db.flush()
     return {"created": created, "updated": updated}
 
 
@@ -210,7 +218,9 @@ def _asin_from_filename(source_file: str) -> str | None:
 
 
 def _review_id_from_url(url: str | None) -> str | None:
-    match = re.search(r"customer-reviews/([A-Z0-9]+)", url or "", re.I)
+    match = re.search(r"customer-reviews/(?:srp/)?-/([A-Z0-9]+)", url or "", re.I)
+    if not match:
+        match = re.search(r"customer-reviews/([A-Z0-9]+)", url or "", re.I)
     return match.group(1).upper() if match else None
 
 
