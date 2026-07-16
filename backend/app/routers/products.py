@@ -13,8 +13,10 @@ from app.security import get_current_user
 from app.services.data_quality import validate_product_rows
 from app.services.import_jobs import create_import_job
 from app.services.product_importer import (
+    import_company_master_products,
     import_internal_store_products,
     import_sellersprite_products,
+    preview_company_master_products,
     preview_internal_store_products,
     preview_sellersprite_products,
 )
@@ -383,3 +385,34 @@ def import_sellersprite_products_endpoint(
     )
     db.commit()
     return {"source": "sellersprite_products", "quality": quality, **result}
+
+
+@router.get("/import-preview/company-master")
+def preview_company_master_products_endpoint(
+    path: str = "/Users/jcc_mac/Documents/A新禾亚马逊一部/亚马逊一部亚马逊总产品表.xlsx",
+    limit: int = 20,
+):
+    items = preview_company_master_products(path, limit)
+    return {"source": "company_master_products", "items": items, "quality": validate_product_rows(items)}
+
+
+@router.post("/import/company-master")
+def import_company_master_products_endpoint(
+    path: str = "/Users/jcc_mac/Documents/A新禾亚马逊一部/亚马逊一部亚马逊总产品表.xlsx",
+    limit: int = 200,
+    db: Session = Depends(get_db),
+):
+    preview_rows = preview_company_master_products(path, limit)
+    quality = validate_product_rows(preview_rows)
+    result = import_company_master_products(db, path, limit)
+    create_import_job(
+        db,
+        import_type="company_master_products",
+        source_name=path,
+        total_rows=quality["total_rows"],
+        success_rows=result["created"] + result["updated"],
+        warning_rows=quality["warning_rows"],
+        issue_summary=quality,
+    )
+    db.commit()
+    return {"source": "company_master_products", "quality": quality, **result}

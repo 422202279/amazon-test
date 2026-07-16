@@ -15,6 +15,8 @@ from app.models.store import Store
 from app.services.data_quality import validate_product_rows
 from app.services.import_jobs import create_import_job
 from app.services.product_importer import (
+    preview_company_master_products,
+    import_company_master_products,
     import_internal_store_products,
     import_sellersprite_products,
     import_internal_store_links,
@@ -29,6 +31,7 @@ from app.services.query_helpers import split_identifier_terms
 INTERNAL_WORKBOOK = "/Users/jcc_mac/Documents/A新禾亚马逊一部/产品信息汇总表 新系统一些SKU加点版本_在售版本汇总.xlsx"
 SELLERSPRITE_HISTORY_WORKBOOK = "/Users/jcc_mac/Downloads/product-CA-sales-20260702-71124.xlsx"
 SELLERSPRITE_UK_WORKBOOK = "/Users/jcc_mac/Documents/Codex项目/卖家精灵原始数据汇总/新禾亚马逊一部店铺产品卖家精灵数据/20260703/Product-UK-20260703.xlsx"
+COMPANY_MASTER_WORKBOOK = "/Users/jcc_mac/Documents/A新禾亚马逊一部/亚马逊一部亚马逊总产品表.xlsx"
 
 
 class ImporterTests(unittest.TestCase):
@@ -106,6 +109,24 @@ class ImporterTests(unittest.TestCase):
 
         self.assertGreaterEqual(result["created"], 5)
         self.assertEqual(product_count, result["created"] + result["updated"])
+
+    def test_company_master_preserves_multisite_product_data(self):
+        rows = preview_company_master_products(COMPANY_MASTER_WORKBOOK, limit=200)
+
+        self.assertEqual(len(rows), 200)
+        self.assertEqual({row["site_code"] for row in rows}, {"US", "UK", "DE", "JP", "FR", "CA"})
+        canada = next(row for row in rows if row["asin"] == "B0CHJ55J9G" and row["site_code"] == "CA")
+        self.assertEqual(canada["store_name"], "加拿大")
+        self.assertIsNotNone(canada["title"])
+        self.assertIsNotNone(canada["product_url"])
+
+        with self.session_factory() as db:
+            result = import_company_master_products(db, COMPANY_MASTER_WORKBOOK, limit=200)
+            db.commit()
+            product_count = db.query(Product).count()
+
+        self.assertEqual(product_count, 200)
+        self.assertEqual(result["created"], 200)
 
     def test_product_quality_summary_flags_missing_identifiers(self):
         rows = [

@@ -15,6 +15,7 @@ from app.routers.reviews import _serialize_review, list_review_capture_jobs, lis
 from app.models.user_account import UserAccount
 from app.services.data_quality import build_data_quality_summary, validate_review_rows
 from app.models.review import Review
+from app.models.product import Product
 from app.models.supplier_task import SupplierTask
 from app.services.review_importer import (
     import_reviews_from_workbook,
@@ -150,6 +151,24 @@ class ReviewWorkflowTests(unittest.TestCase):
         self.assertEqual(group["media_review_count"], 1)
         self.assertEqual(group["star_counts"], {"1": 1, "2": 0, "3": 0, "4": 0, "5": 1})
         self.assertEqual(group["source_types"], ["sellersprite_review_export"])
+
+    def test_review_backfill_uses_site_and_asin_not_asin_alone(self):
+        from app.services.review_importer import backfill_review_product_metadata
+
+        with self.session_factory() as db:
+            db.add_all([
+                Product(platform="Amazon", site_code="US", store_name="美国店", asin="B0SAME0001", title="US Title"),
+                Product(platform="Amazon", site_code="CA", store_name="加拿大店", asin="B0SAME0001", title="CA Title"),
+                Review(platform="Amazon", site_code="CA", asin="B0SAME0001", star_rating=3),
+            ])
+            db.commit()
+            result = backfill_review_product_metadata(db)
+            db.commit()
+            review = db.query(Review).one()
+
+        self.assertEqual(result["updated"], 1)
+        self.assertEqual(review.store_name, "加拿大店")
+        self.assertEqual(review.product_title, "CA Title")
 
     def test_review_capture_queue_extracts_asin_and_site_from_amazon_urls(self):
         with self.session_factory() as db:

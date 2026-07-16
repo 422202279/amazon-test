@@ -58,8 +58,12 @@ def import_reviews_from_workbook(db: Session, path: str | Path, sheet_name: str 
     rows = preview_reviews_from_workbook(path, sheet_name, limit, source_file)
     source_asin = _asin_from_filename(source_file)
     source_product = None
+    source_site = _site_from_filename(source_file)
     if source_asin:
-        source_product = db.execute(select(Product).where(Product.asin == source_asin)).scalar_one_or_none()
+        product_query = select(Product).where(Product.asin == source_asin)
+        if source_site:
+            product_query = product_query.where(Product.site_code == source_site)
+        source_product = db.execute(product_query.order_by(Product.updated_at.desc())).scalars().first()
     created = 0
     updated = 0
     pending_reviews: dict[tuple[str, str, str | None, str | None], Review] = {}
@@ -93,6 +97,32 @@ def import_reviews_from_workbook(db: Session, path: str | Path, sheet_name: str 
     # Make this file's rows visible to the next file in a batch before the final transaction commit.
     db.flush()
     return {"created": created, "updated": updated}
+
+
+def backfill_review_product_metadata(db: Session) -> dict[str, int]:
+    """Fill only missing review context from the product master, keyed by site plus ASIN."""
+    updated = 0
+    reviews = db.execute(select(Review).where(Review.asin.is_not(None))).scalars().all()
+    product_cache: dict[tuple[str, str], Product | None] = {}
+    for review in reviews:
+        key = (review.site_code, review.asin or "")
+        if key not in product_cache:
+            product_cache[key] = db.execute(
+                select(Product)
+                .where(Product.site_code == review.site_code, Product.asin == review.asin)
+                .order_by(Product.updated_at.desc())
+            ).scalars().first()
+        product = product_cache[key]
+        if not product:
+            continue
+        changed = False
+        for field, value in (("store_name", product.store_name), ("product_title", product.title), ("product_url", product.product_url)):
+            if not getattr(review, field) and value:
+                setattr(review, field, value)
+                changed = True
+        if changed:
+            updated += 1
+    return {"updated": updated}
 
 
 def normalize_review_row(row: pd.Series, source_file: str) -> NormalizedReviewRow:

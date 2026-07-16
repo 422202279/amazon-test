@@ -24,6 +24,7 @@ class NormalizedProductRow:
     sku: str | None = None
     asin: str | None = None
     parent_asin: str | None = None
+    localized_title: str | None = None
     brand: str | None = None
     category_path: str | None = None
     category_name: str | None = None
@@ -109,6 +110,13 @@ def preview_sellersprite_products(path: str | Path, sheet_name: str | None = Non
         target_sheet = sheet_name or workbook.sheet_names[0]
     df = pd.read_excel(path, sheet_name=target_sheet)
     rows = [normalize_sellersprite_row(row, Path(path).name) for _, row in df.head(limit).iterrows()]
+    return [asdict(row) for row in rows]
+
+
+def preview_company_master_products(path: str | Path, limit: int = 200) -> list[dict]:
+    """Read the department's consolidated Amazon master without losing source fields."""
+    df = pd.read_excel(path, sheet_name="合并总表")
+    rows = [normalize_company_master_row(row, Path(path).name) for _, row in df.head(limit).iterrows()]
     return [asdict(row) for row in rows]
 
 
@@ -232,6 +240,15 @@ def import_internal_store_products(db: Session, path: str | Path, limit: int = 2
 
 def import_sellersprite_products(db: Session, path: str | Path, limit: int = 200, sheet_name: str | None = None) -> dict[str, int]:
     rows = preview_sellersprite_products(path, sheet_name, limit)
+    result = _upsert_products(db, rows)
+    store_result = sync_store_registry_from_products(db, rows)
+    result["stores_created"] = store_result["created"]
+    result["stores_updated"] = store_result["updated"]
+    return result
+
+
+def import_company_master_products(db: Session, path: str | Path, limit: int = 200) -> dict[str, int]:
+    rows = preview_company_master_products(path, limit)
     result = _upsert_products(db, rows)
     store_result = sync_store_registry_from_products(db, rows)
     result["stores_created"] = store_result["created"]
@@ -383,6 +400,51 @@ def normalize_sellersprite_row(row: pd.Series, source_file: str) -> NormalizedPr
     )
 
 
+def normalize_company_master_row(row: pd.Series, source_file: str) -> NormalizedProductRow:
+    """Normalize the company master. It is authoritative for store attribution."""
+    site_code = _site_code_from_master_value(_safe_text(row.get("站点")))
+    return NormalizedProductRow(
+        platform="Amazon",
+        site_code=site_code,
+        store_name=_safe_text(row.get("店铺名称")),
+        department_item_no=_safe_text(row.get("ITEM NO.")),
+        sku=_safe_text(row.get("SKU")),
+        asin=_safe_text(row.get("ASIN")),
+        parent_asin=_safe_text(row.get("父ASIN")),
+        title=_safe_text(row.get("商品标题")) or "未命名产品",
+        localized_title=_safe_text(row.get("商品标题中文翻译")),
+        brand=_safe_text(row.get("品牌")),
+        category_path=_safe_text(row.get("类目路径")),
+        category_name=_safe_text(row.get("小类目")) or _safe_text(row.get("大类目")),
+        product_url=_safe_text(row.get("商品详情页链接")),
+        image_url=_safe_text(row.get("商品主图")) or _safe_text(row.get("图片")),
+        price_amount=_first_prefixed_number(row, "价格("),
+        price_currency=_safe_text(row.get("币种")) or _detect_currency_from_columns(row.index),
+        monthly_sales=_coerce_int(row.get("月销量")),
+        monthly_revenue=_first_prefixed_number(row, "月销售额("),
+        review_count=_coerce_int(row.get("评分数")),
+        rating=_coerce_float(row.get("评分")),
+        qa_count=_coerce_int(row.get("Q&A")),
+        variation_count=_coerce_int(row.get("变体数")),
+        seller_count=_coerce_int(row.get("卖家数")),
+        buybox_seller=_safe_text(row.get("BuyBox卖家")),
+        fulfillment_type=_safe_text(row.get("配送方式")),
+        launch_date=_coerce_date(row.get("上架时间")),
+        keyword_total=_coerce_int(row.get("AC关键词")),
+        bsr_main=_coerce_int(row.get("大类BSR")),
+        bsr_sub=_coerce_int(row.get("小类BSR")),
+        weight_text=_safe_text(row.get("商品重量（单位换算）")) or _safe_text(row.get("商品重量")),
+        size_text=_safe_text(row.get("商品尺寸（单位换算）")) or _safe_text(row.get("商品尺寸")),
+        package_weight_text=_safe_text(row.get("包装重量（单位换算）")) or _safe_text(row.get("包装重量")),
+        package_size_text=_safe_text(row.get("包装尺寸（单位换算）")) or _safe_text(row.get("包装尺寸")),
+        supplier_factory=_safe_text(row.get("工厂")),
+        supplier_name=_safe_text(row.get("工厂")),
+        status="正常监控",
+        source_file=source_file,
+        raw_payload=json.dumps(_normalize_payload(row), ensure_ascii=False),
+    )
+
+
 def normalize_store_row(row: pd.Series, source_file: str) -> NormalizedStoreRow:
     raw_store_name = _safe_text(row.get("店铺")) or _safe_text(row.get("店铺名称"))
     url = _safe_text(row.get("所有产品页链接"))
@@ -444,6 +506,14 @@ def infer_site_code(url: str | None, store_name: str | None) -> str:
     if "韩国" in text or "coupang" in text or "naver" in text:
         return "KR"
     return "US"
+
+
+def _site_code_from_master_value(value: str | None) -> str:
+    text = value or ""
+    for label, code in (("美国", "US"), ("英国", "UK"), ("德国", "DE"), ("日本", "JP"), ("法国", "FR"), ("加拿大", "CA")):
+        if label in text:
+            return code
+    return infer_site_code(None, text)
 
 
 def _infer_platform(url: str | None, store_name: str | None) -> str:
