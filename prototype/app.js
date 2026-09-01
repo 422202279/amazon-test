@@ -151,6 +151,7 @@ let roles = [
 
 // Open the compact ASIN overview first; raw comments remain a drill-down view.
 let reviewViewMode = "product";
+let reviewPagination = { offset: 0, limit: 100, total: 0, groupCount: 0 };
 
 function statusClass(status) {
   if (["正常监控", "已整改", "最新", "可导出", "已关闭"].includes(status)) return "success";
@@ -783,7 +784,8 @@ function renderReviews() {
       </tr>
     `).join("") || '<tr><td colspan="13" class="empty-state">当前筛选条件下暂无评论数据。</td></tr>';
     bindReviewSort();
-    updateReviewSummary(sortedGroups, true);
+    updateReviewSummary(sortedGroups, true, reviewPagination.total);
+    renderReviewPagination(true);
     return;
   }
   const sortedReviews = applySort(reviews, reviewSortState, getReviewSortValue);
@@ -795,7 +797,7 @@ function renderReviews() {
           <div>
             <span class="cell-title">${review.id}</span>
             <span class="cell-sub">${review.title}</span>
-            <span class="cell-sub">评论人：Demo User</span>
+            <span class="cell-sub">评论人：${review.reviewer || "匿名买家"} · ${review.reviewedAt || "未记录时间"}</span>
           </div>
         </div>
       </td>
@@ -818,7 +820,8 @@ function renderReviews() {
     </tr>
   `).join("") || '<tr><td colspan="13" class="empty-state">当前筛选条件下暂无评论数据。</td></tr>';
   bindReviewSort();
-  updateReviewSummary(sortedReviews, false);
+  updateReviewSummary(sortedReviews, false, reviewPagination.total);
+  renderReviewPagination(false);
   bindReviewRowActions();
 }
 
@@ -877,7 +880,7 @@ function bindReviewSort() {
   });
 }
 
-function updateReviewSummary(items, isGrouped) {
+function updateReviewSummary(items, isGrouped, totalCount = items.length) {
   const total = document.getElementById("reviews-summary-total");
   const negative = document.getElementById("reviews-summary-negative");
   const media = document.getElementById("reviews-summary-media");
@@ -887,7 +890,7 @@ function updateReviewSummary(items, isGrouped) {
 
   if (isGrouped) {
     const allReviews = items.flatMap((group) => group.recent_reviews || []);
-    total.textContent = `产品组 ${items.length}`;
+    total.textContent = `产品组 ${reviewPagination.groupCount || items.length} · 评论 ${totalCount}`;
     negative.textContent = `聚合差评 ${items.reduce((sum, group) => sum + (group.negative_review_count || 0), 0)}`;
     media.textContent = `含图/视频组 ${items.filter((group) => (group.recent_reviews || []).some((review) => review.has_images || review.review_images)).length}`;
     feedback.textContent = `已生成任务组 ${items.filter((group) => (group.supplier_task_statuses || []).length).length}`;
@@ -895,11 +898,37 @@ function updateReviewSummary(items, isGrouped) {
     return;
   }
 
-  total.textContent = `评论总数 ${items.length}`;
+  total.textContent = `评论总数 ${totalCount}`;
   negative.textContent = `1~2 星 ${items.filter((item) => item.stars <= 2).length}`;
   media.textContent = `带图评论 ${items.filter((item) => item.hasImage).length}`;
   feedback.textContent = `未反馈供应商 ${items.filter((item) => item.feedback === "未反馈").length}`;
   recent.textContent = `近期待处理 ${items.filter((item) => item.rectify !== "已关闭" && item.rectify !== "已整改").length}`;
+}
+
+function renderReviewPagination(isGrouped) {
+  const target = document.getElementById("reviews-pagination");
+  if (!target) return;
+  const total = reviewPagination.total || 0;
+  if (isGrouped) {
+    target.innerHTML = `<span>当前按产品聚合展示 ${reviews.length} / ${reviewPagination.groupCount || reviews.length} 个产品组，共 ${total} 条真实评论</span>`;
+    return;
+  }
+  const { offset, limit } = reviewPagination;
+  const start = total ? offset + 1 : 0;
+  const end = Math.min(offset + reviews.length, total);
+  target.innerHTML = `
+    <span>显示 ${start}-${end} / ${total} 条</span>
+    <button type="button" data-review-page="prev" ${offset <= 0 ? "disabled" : ""}>上一页</button>
+    <button type="button" data-review-page="next" ${offset + limit >= total ? "disabled" : ""}>下一页</button>
+  `;
+  target.querySelector('[data-review-page="prev"]')?.addEventListener("click", () => {
+    reviewPagination.offset = Math.max(0, reviewPagination.offset - reviewPagination.limit);
+    hydrateReviews();
+  });
+  target.querySelector('[data-review-page="next"]')?.addEventListener("click", () => {
+    reviewPagination.offset += reviewPagination.limit;
+    hydrateReviews();
+  });
 }
 
 function renderComparison() {
@@ -1491,10 +1520,10 @@ function applyInitialPageFilters() {
     if (media && document.getElementById("reviews-media-filter")) {
       document.getElementById("reviews-media-filter").value = media;
     }
-    if (view) {
-      reviewViewMode = view;
+    if (view || sessionStorage.getItem("cb-review-view-mode")) {
+      reviewViewMode = view || sessionStorage.getItem("cb-review-view-mode");
       document.querySelectorAll("[data-review-view]").forEach((button) => {
-        button.classList.toggle("active", button.getAttribute("data-review-view") === view);
+        button.classList.toggle("active", button.getAttribute("data-review-view") === reviewViewMode);
       });
     }
     if (q && document.getElementById("reviews-search-input")) {
@@ -1649,11 +1678,9 @@ function bindReviewViewSwitch() {
       buttons.forEach((item) => item.classList.remove("active"));
       button.classList.add("active");
       reviewViewMode = button.getAttribute("data-review-view") || "timeline";
+      reviewPagination.offset = 0;
+      sessionStorage.setItem("cb-review-view-mode", reviewViewMode);
       await hydrateReviews();
-      if (reviewViewMode === "negative") {
-        reviews = reviews.filter((item) => ("recent_reviews" in item ? true : item.stars <= 3));
-      }
-      renderReviews();
     });
   });
 }
@@ -1682,6 +1709,7 @@ function bindReviewFilters() {
   document.getElementById("reviews-store-filter")?.addEventListener("change", () => backfillSiteFromStore("reviews"));
   if (!button) return;
   button.addEventListener("click", async () => {
+    reviewPagination.offset = 0;
     await hydrateReviews();
   });
 }
@@ -1990,33 +2018,41 @@ async function hydrateReviews() {
   try {
     const mode = reviewViewMode === "negative" ? "timeline" : reviewViewMode;
     const params = buildSearchParams(document.getElementById("reviews-search-input")?.value);
-    params.set("limit", "100");
+    const isGrouped = mode === "product";
+    params.set("limit", isGrouped ? "300" : String(reviewPagination.limit));
+    if (!isGrouped) params.set("offset", String(reviewPagination.offset));
     params.set("view_mode", mode);
+    if (reviewViewMode === "negative") params.set("negative_only", "true");
     const platform = document.getElementById("reviews-platform-filter")?.value;
     const siteCode = document.getElementById("reviews-site-filter")?.value;
     const storeName = document.getElementById("reviews-store-filter")?.value;
     if (platform) params.set("platform", platform);
     if (siteCode) params.set("site_code", siteCode);
     if (storeName) params.set("store_name", storeName);
+    const stars = document.getElementById("reviews-stars-filter")?.value;
+    const media = document.getElementById("reviews-media-filter")?.value;
+    const issueCategory = document.getElementById("reviews-issue-filter")?.value;
+    const feedback = document.getElementById("reviews-feedback-filter")?.value;
+    const period = document.getElementById("reviews-period-filter")?.value;
+    if (stars) params.set("stars", stars);
+    if (media) params.set("media", media);
+    if (issueCategory) params.set("issue_category", issueCategory);
+    if (feedback) params.set("feedback", feedback);
+    if (period && period !== "all") params.set("period", period);
     const data = await fetchJson(`/reviews?${params.toString()}`);
     reviews = mode === "product" ? (data.items || []) : (data.items || []).map(mapReviewFromApi);
-    if (reviewViewMode === "negative") {
-      reviews = reviews.filter((item) => item.stars <= 3);
-    }
-    reviews = mode === "product"
-      ? reviews
-        .filter((item) => !platform || (item.recent_reviews || []).some((review) => review.platform === platform))
-        .filter((item) => !siteCode || (item.sites || []).includes(localizeSite(siteCode)))
-        .filter((item) => !storeName || (item.stores || []).includes(storeName))
-      : reviews
-        .filter((item) => !platform || item.platform === platform)
-        .filter((item) => !siteCode || reverseLocalizeSite(item.site) === siteCode)
-        .filter((item) => !storeName || item.store === storeName);
-    reviews = filterReviewsLocally(reviews, mode === "product");
+    reviewPagination = {
+      ...reviewPagination,
+      total: data.total || 0,
+      groupCount: data.group_count || 0,
+      offset: data.offset || 0,
+      limit: data.limit || reviewPagination.limit,
+    };
     renderReviews();
     if (document.body.dataset.page === "dashboard") renderDashboard();
   } catch (error) {
     reviews = [];
+    reviewPagination = { ...reviewPagination, total: 0, groupCount: 0 };
     renderReviews();
     console.warn("Reviews API unavailable", error);
   }
@@ -4348,6 +4384,7 @@ function mapReviewFromApi(item) {
     rectify: item.rectification_status || "待反馈",
     source: item.source_type || "导入",
     asin: item.asin || "-",
+    reviewer: item.reviewer_name || "",
     reviewedAt: item.reviewed_at || "",
     supplierTaskCode: item.supplier_task_code || "",
     supplierTaskStatus: item.supplier_task_status || "",

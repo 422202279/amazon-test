@@ -89,6 +89,17 @@ class ReviewWorkflowTests(unittest.TestCase):
 
         self.assertEqual(files, [review])
 
+    def test_review_batch_scanner_finds_exports_in_nested_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            nested = Path(directory) / "review-exports"
+            nested.mkdir()
+            review = nested / "B0CHJ55J9G-CA-Reviews-20260711.xlsx"
+            review.touch()
+
+            files = find_sellersprite_review_exports(directory)
+
+        self.assertEqual(files, [review])
+
     def test_sellersprite_review_columns_keep_media_country_and_review_id(self):
         row = pd.Series({
             "ASIN": "B0CHJ55J9G",
@@ -151,6 +162,23 @@ class ReviewWorkflowTests(unittest.TestCase):
         self.assertEqual(group["media_review_count"], 1)
         self.assertEqual(group["star_counts"], {"1": 1, "2": 0, "3": 0, "4": 0, "5": 1})
         self.assertEqual(group["source_types"], ["sellersprite_review_export"])
+
+    def test_timeline_filters_negative_reviews_before_pagination(self):
+        with self.session_factory() as db:
+            db.add_all([
+                Review(platform="Amazon", site_code="CA", asin="B0FILTER01", star_rating=5, review_content="Great"),
+                Review(
+                    platform="Amazon", site_code="CA", asin="B0FILTER01", star_rating=1,
+                    review_content="Broken", reviewer_name="Real Reviewer", is_negative_review=True,
+                ),
+            ])
+            db.commit()
+
+            result = list_reviews(view_mode="timeline", negative_only=True, limit=1, offset=0, db=db)
+
+        self.assertEqual(result["total"], 1)
+        self.assertEqual(len(result["items"]), 1)
+        self.assertEqual(result["items"][0]["reviewer_name"], "Real Reviewer")
 
     def test_review_backfill_uses_site_and_asin_not_asin_alone(self):
         from app.services.review_importer import backfill_review_product_metadata

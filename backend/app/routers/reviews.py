@@ -1,5 +1,5 @@
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
@@ -129,6 +129,12 @@ def list_reviews(
     platform: str | None = None,
     site_code: str | None = None,
     store_name: str | None = None,
+    stars: str | None = None,
+    media: str | None = None,
+    issue_category: str | None = None,
+    feedback: str | None = None,
+    period: str | None = None,
+    negative_only: bool = False,
     view_mode: str = "timeline",
     db: Session = Depends(get_db),
 ):
@@ -139,6 +145,27 @@ def list_reviews(
         query = query.filter(Review.site_code == site_code)
     if store_name:
         query = query.filter(Review.store_name == store_name)
+    if stars == "1-2":
+        query = query.filter(Review.star_rating <= 2)
+    elif stars == "3":
+        query = query.filter(Review.star_rating == 3)
+    elif stars == "4-5":
+        query = query.filter(Review.star_rating >= 4)
+    if media == "with-media":
+        query = query.filter(Review.has_images.is_(True))
+    elif media == "without-media":
+        query = query.filter(Review.has_images.is_(False))
+    if issue_category:
+        query = query.filter(Review.issue_category == issue_category)
+    if feedback == "已反馈":
+        query = query.filter(Review.feedback_to_supplier.is_(True))
+    elif feedback == "未反馈":
+        query = query.filter(Review.feedback_to_supplier.is_(False))
+    period_days = {"30d": 30, "60d": 60, "90d": 90, "180d": 180, "365d": 365, "1095d": 1095}.get(period or "")
+    if period_days:
+        query = query.filter(Review.reviewed_at >= datetime.now() - timedelta(days=period_days))
+    if negative_only:
+        query = query.filter(Review.is_negative_review.is_(True))
     terms = split_identifier_terms(identifiers)
     if terms:
         query = query.filter(or_(Review.asin.in_(terms), Review.product_title.in_(terms)))

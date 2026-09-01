@@ -13,7 +13,7 @@ def find_sellersprite_review_exports(directory: str | Path) -> list[Path]:
     if not root.exists() or not root.is_dir():
         return []
     return sorted(
-        path for path in root.iterdir()
+        path for path in root.rglob("*")
         if path.is_file() and re.search(r"-[A-Z]{2}-Reviews-.*\.xlsx?$", path.name, re.I)
     )
 

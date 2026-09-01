@@ -889,6 +889,32 @@ tbody tr:hover {
   color: var(--red);
 }
 
+.table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 0 18px 18px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.table-pagination button {
+  min-width: 72px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.table-pagination button:disabled {
+  cursor: not-allowed;
+  color: #a6b2c1;
+  background: #f5f7fa;
+}
+
 .compare-pool {
   display: flex;
   flex-wrap: wrap;
